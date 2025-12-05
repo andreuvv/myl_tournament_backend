@@ -30,12 +30,7 @@ SELECT
         WHEN m.completed AND m.player1_id = p.id THEN m.score1
         WHEN m.completed AND m.player2_id = p.id THEN m.score2
         ELSE 0
-    END) as total_points_scored,
-    SUM(CASE 
-        WHEN m.completed AND m.player1_id = p.id THEN m.score2
-        WHEN m.completed AND m.player2_id = p.id THEN m.score1
-        ELSE 0
-    END) as total_points_against
+    END) as total_points_scored
 FROM players p
 LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id)
 WHERE p.confirmed = true

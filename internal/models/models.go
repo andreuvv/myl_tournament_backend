@@ -43,14 +43,13 @@ type MatchDetail struct {
 }
 
 type Standing struct {
-	ID                 int    `json:"id"`
-	Name               string `json:"name"`
-	MatchesPlayed      int    `json:"matches_played"`
-	Wins               int    `json:"wins"`
-	Ties               int    `json:"ties"`
-	Losses             int    `json:"losses"`
-	TotalPointsScored  int    `json:"total_points_scored"`
-	TotalPointsAgainst int    `json:"total_points_against"`
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	MatchesPlayed     int    `json:"matches_played"`
+	Wins              int    `json:"wins"`
+	Ties              int    `json:"ties"`
+	Losses            int    `json:"losses"`
+	TotalPointsScored int    `json:"total_points_scored"`
 }
 
 // Request/Response DTOs
