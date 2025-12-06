@@ -28,6 +28,19 @@ func RunMigrations() error {
 		return fmt.Errorf("failed to get applied migrations: %w", err)
 	}
 
+	// If this is the first time running migrations and the standings view exists,
+	// mark old migrations as applied to avoid conflicts
+	if len(appliedMigrations) == 0 {
+		if err := markExistingMigrationsAsApplied(); err != nil {
+			log.Printf("⚠️  Warning: Could not mark existing migrations: %v", err)
+		}
+		// Refresh the list of applied migrations
+		appliedMigrations, err = getAppliedMigrations()
+		if err != nil {
+			return fmt.Errorf("failed to get applied migrations: %w", err)
+		}
+	}
+
 	// Read migration files
 	migrationsDir := "migrations"
 	files, err := os.ReadDir(migrationsDir)
@@ -71,16 +84,48 @@ func RunMigrations() error {
 
 		// Record migration as applied
 		if err := recordMigration(version); err != nil {
-			return fmt.Errorf("failed to record migration %s: %w", filename, err)
-		}
+	return nil
+}
 
-		pendingCount++
-		log.Printf("✓ Migration applied: %s", filename)
+func markExistingMigrationsAsApplied() error {
+	// Check if standings view exists
+	var viewExists bool
+	err := DB.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.views 
+			WHERE table_name = 'standings'
+		)
+	`).Scan(&viewExists)
+	if err != nil {
+		return err
 	}
 
-	if pendingCount == 0 {
-		log.Println("✓ All migrations up to date")
-	} else {
+	if viewExists {
+		log.Println("📋 Detected existing database schema, marking old migrations as applied...")
+		// Mark migrations 001, 002, and 003 as applied since they were run manually
+		oldMigrations := []string{
+			"001_initial_schema",
+			"002_fix_standings_view",
+			"003_add_ties_to_standings",
+		}
+		for _, migration := range oldMigrations {
+			if err := recordMigration(migration); err != nil {
+				return err
+			}
+			log.Printf("✓ Marked as applied: %s.sql", migration)
+		}
+	}
+
+	return nil
+}
+
+func recordMigration(version string) error {
+	_, err := DB.Exec(
+		"INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING",
+		version,
+	)
+	return err
+}} else {
 		log.Printf("✓ Applied %d migration(s)", pendingCount)
 	}
 
