@@ -49,6 +49,7 @@ type Standing struct {
 	Wins              int    `json:"wins"`
 	Ties              int    `json:"ties"`
 	Losses            int    `json:"losses"`
+	Points            int    `json:"points"`
 	TotalPointsScored int    `json:"total_points_scored"`
 }
 

@@ -92,9 +92,10 @@ func GetStandings(c *gin.Context) {
 			wins,
 			ties,
 			losses,
+			points,
 			total_points_scored
 		FROM standings
-		ORDER BY wins DESC, total_points_scored DESC
+		ORDER BY points DESC, total_points_scored DESC
 	`
 
 	rows, err := database.DB.Query(query)
@@ -114,6 +115,7 @@ func GetStandings(c *gin.Context) {
 			&s.Wins,
 			&s.Ties,
 			&s.Losses,
+			&s.Points,
 			&s.TotalPointsScored,
 		)
 		if err != nil {
