@@ -1,7 +1,6 @@
 package database
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -51,7 +50,7 @@ func RunMigrations() error {
 	pendingCount := 0
 	for _, filename := range migrationFiles {
 		version := strings.TrimSuffix(filename, ".sql")
-		
+
 		// Skip if already applied
 		if _, exists := appliedMigrations[version]; exists {
 			continue
