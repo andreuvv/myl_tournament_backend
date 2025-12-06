@@ -84,6 +84,19 @@ func RunMigrations() error {
 
 		// Record migration as applied
 		if err := recordMigration(version); err != nil {
+			return fmt.Errorf("failed to record migration %s: %w", filename, err)
+		}
+
+		pendingCount++
+		log.Printf("✓ Migration applied: %s", filename)
+	}
+
+	if pendingCount == 0 {
+		log.Println("✓ All migrations up to date")
+	} else {
+		log.Printf("✓ Applied %d migration(s)", pendingCount)
+	}
+
 	return nil
 }
 
@@ -119,19 +132,6 @@ func markExistingMigrationsAsApplied() error {
 	return nil
 }
 
-func recordMigration(version string) error {
-	_, err := DB.Exec(
-		"INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING",
-		version,
-	)
-	return err
-}} else {
-		log.Printf("✓ Applied %d migration(s)", pendingCount)
-	}
-
-	return nil
-}
-
 func getAppliedMigrations() (map[string]bool, error) {
 	rows, err := DB.Query("SELECT version FROM schema_migrations")
 	if err != nil {
@@ -153,7 +153,7 @@ func getAppliedMigrations() (map[string]bool, error) {
 
 func recordMigration(version string) error {
 	_, err := DB.Exec(
-		"INSERT INTO schema_migrations (version) VALUES ($1)",
+		"INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT (version) DO NOTHING",
 		version,
 	)
 	return err
