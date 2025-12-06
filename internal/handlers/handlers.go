@@ -300,3 +300,49 @@ func CreateFixture(c *gin.Context) {
 		"rounds_created":  len(req.Rounds),
 	})
 }
+
+// ClearTournament deletes all matches and rounds, optionally players too
+func ClearTournament(c *gin.Context) {
+	// Check if we should also clear players
+	clearPlayers := c.Query("clear_players") == "true"
+
+	tx, err := database.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
+	// Delete matches first (foreign key constraint)
+	if _, err := tx.Exec("DELETE FROM matches"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete matches"})
+		return
+	}
+
+	// Delete rounds
+	if _, err := tx.Exec("DELETE FROM rounds"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete rounds"})
+		return
+	}
+
+	// Optionally delete players
+	if clearPlayers {
+		if _, err := tx.Exec("DELETE FROM players"); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete players"})
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	message := "Tournament cleared: matches and rounds deleted"
+	if clearPlayers {
+		message = "Tournament cleared: matches, rounds, and players deleted"
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": message})
+}
+

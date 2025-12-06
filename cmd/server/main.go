@@ -54,6 +54,9 @@ func main() {
 
 		// Fixture creation (creates entire tournament structure)
 		protected.POST("/fixture", handlers.CreateFixture)
+
+		// Clear tournament data
+		protected.DELETE("/tournament", handlers.ClearTournament)
 	}
 
 	// Health check
