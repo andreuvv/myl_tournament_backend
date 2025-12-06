@@ -70,8 +70,8 @@ type CreateMatchRequest struct {
 }
 
 type UpdateScoreRequest struct {
-	Score1 int `json:"score1" binding:"required,min=0"`
-	Score2 int `json:"score2" binding:"required,min=0"`
+	Score1 int `json:"score1" binding:"gte=0"`
+	Score2 int `json:"score2" binding:"gte=0"`
 }
 
 type FixtureRound struct {
