@@ -23,6 +23,11 @@ func main() {
 	}
 	defer database.Close()
 
+	// Run database migrations
+	if err := database.RunMigrations(); err != nil {
+		log.Fatal("Failed to run migrations:", err)
+	}
+
 	// Set up Gin router
 	router := gin.Default()
 
