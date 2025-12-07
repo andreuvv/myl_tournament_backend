@@ -43,7 +43,8 @@ SELECT
         ELSE 0
     END), 0) as total_points_scored,
     COALESCE(SUM(CASE 
-        WHEN m.completed THEN (COALESCE(m.score1, 0) + COALESCE(m.score2, 0))
+        WHEN m.completed AND (m.player1_id = p.id OR m.player2_id = p.id) 
+        THEN (COALESCE(m.score1, 0) + COALESCE(m.score2, 0))
         ELSE 0
     END), 0) as total_matches
 FROM players p
