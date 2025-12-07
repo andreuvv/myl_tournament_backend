@@ -44,12 +44,11 @@ SELECT
         WHEN m.completed AND m.player2_id = p.id THEN m.score2
         ELSE 0
     END) as total_points_scored,
-    -- Total individual matches (sum of all scores in completed matches)
-    SUM(CASE 
-        WHEN m.completed AND m.player1_id = p.id THEN (m.score1 + m.score2)
-        WHEN m.completed AND m.player2_id = p.id THEN (m.score1 + m.score2)
+    -- Total individual matches played (sum of both scores for each match the player participated in)
+    COALESCE(SUM(CASE 
+        WHEN m.completed THEN (COALESCE(m.score1, 0) + COALESCE(m.score2, 0))
         ELSE 0
-    END) as total_matches
+    END), 0) as total_matches
 FROM players p
 LEFT JOIN matches m ON (m.player1_id = p.id OR m.player2_id = p.id)
 WHERE p.confirmed = true
