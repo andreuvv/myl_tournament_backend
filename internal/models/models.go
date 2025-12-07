@@ -51,6 +51,7 @@ type Standing struct {
 	Losses            int    `json:"losses"`
 	Points            int    `json:"points"`
 	TotalPointsScored int    `json:"total_points_scored"`
+	TotalMatches      int    `json:"total_matches"`
 }
 
 // Request/Response DTOs
