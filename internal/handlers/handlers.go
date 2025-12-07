@@ -137,6 +137,28 @@ func UpdateMatchScore(c *gin.Context) {
 		return
 	}
 
+	// Start transaction
+	tx, err := database.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
+	// Get player IDs for this match
+	var player1ID, player2ID int
+	queryPlayers := `SELECT player1_id, player2_id FROM matches WHERE id = $1`
+	err = tx.QueryRow(queryPlayers, matchID).Scan(&player1ID, &player2ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch match"})
+		return
+	}
+
+	// Update match score
 	query := `
 		UPDATE matches 
 		SET score1 = $1, score2 = $2, completed = true, updated_at = CURRENT_TIMESTAMP
@@ -145,13 +167,38 @@ func UpdateMatchScore(c *gin.Context) {
 	`
 
 	var id int
-	err := database.DB.QueryRow(query, req.Score1, req.Score2, matchID).Scan(&id)
+	err = tx.QueryRow(query, req.Score1, req.Score2, matchID).Scan(&id)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Match not found"})
-			return
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update score"})
+		return
+	}
+
+	// Update player_match_stats for both players
+	totalGames := req.Score1 + req.Score2
+
+	// Player 1 stats
+	upsertStats := `
+		INSERT INTO player_match_stats (player_id, match_id, games_played, games_won, updated_at)
+		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+		ON CONFLICT (player_id, match_id) 
+		DO UPDATE SET games_played = $3, games_won = $4, updated_at = CURRENT_TIMESTAMP
+	`
+	_, err = tx.Exec(upsertStats, player1ID, matchID, totalGames, req.Score1)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update player1 stats"})
+		return
+	}
+
+	// Player 2 stats
+	_, err = tx.Exec(upsertStats, player2ID, matchID, totalGames, req.Score2)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update player2 stats"})
+		return
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
 		return
 	}
 
@@ -313,7 +360,13 @@ func ClearTournament(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	// Delete matches first (foreign key constraint)
+	// Delete player_match_stats first (foreign key constraint)
+	if _, err := tx.Exec("DELETE FROM player_match_stats"); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete player stats"})
+		return
+	}
+
+	// Delete matches (foreign key constraint)
 	if _, err := tx.Exec("DELETE FROM matches"); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete matches"})
 		return
