@@ -93,7 +93,8 @@ func GetStandings(c *gin.Context) {
 			ties,
 			losses,
 			points,
-			total_points_scored
+			total_points_scored,
+			total_matches
 		FROM standings
 		ORDER BY points DESC, total_points_scored DESC
 	`
@@ -117,6 +118,7 @@ func GetStandings(c *gin.Context) {
 			&s.Losses,
 			&s.Points,
 			&s.TotalPointsScored,
+			&s.TotalMatches,
 		)
 		if err != nil {
 			continue
