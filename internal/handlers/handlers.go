@@ -400,3 +400,78 @@ func ClearTournament(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": message})
 }
+
+// DeletePlayer deletes a player by ID
+func DeletePlayer(c *gin.Context) {
+	playerID := c.Param("id")
+
+	query := `DELETE FROM players WHERE id = $1`
+	result, err := database.DB.Exec(query, playerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete player"})
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Player deleted successfully"})
+}
+
+// TogglePlayerConfirmed toggles the confirmed status of a player
+func TogglePlayerConfirmed(c *gin.Context) {
+	playerID := c.Param("id")
+
+	query := `
+		UPDATE players 
+		SET confirmed = NOT confirmed, updated_at = CURRENT_TIMESTAMP 
+		WHERE id = $1 
+		RETURNING id, name, confirmed, created_at, updated_at
+	`
+
+	var player models.Player
+	err := database.DB.QueryRow(query, playerID).Scan(
+		&player.ID,
+		&player.Name,
+		&player.Confirmed,
+		&player.CreatedAt,
+		&player.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update player"})
+		return
+	}
+
+	c.JSON(http.StatusOK, player)
+}
+
+// GetConfirmedPlayers returns only confirmed players
+func GetConfirmedPlayers(c *gin.Context) {
+	query := `SELECT id, name, confirmed, created_at, updated_at FROM players WHERE confirmed = true ORDER BY name`
+
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch confirmed players"})
+		return
+	}
+	defer rows.Close()
+
+	players := []models.Player{}
+	for rows.Next() {
+		var p models.Player
+		err := rows.Scan(&p.ID, &p.Name, &p.Confirmed, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			continue
+		}
+		players = append(players, p)
+	}
+
+	c.JSON(http.StatusOK, players)
+}
