@@ -401,26 +401,6 @@ func ClearTournament(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": message})
 }
 
-// DeletePlayer deletes a player by ID
-func DeletePlayer(c *gin.Context) {
-	playerID := c.Param("id")
-
-	query := `DELETE FROM players WHERE id = $1`
-	result, err := database.DB.Exec(query, playerID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete player"})
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil || rowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Player deleted successfully"})
-}
-
 // TogglePlayerConfirmed toggles the confirmed status of a player
 func TogglePlayerConfirmed(c *gin.Context) {
 	playerID := c.Param("id")

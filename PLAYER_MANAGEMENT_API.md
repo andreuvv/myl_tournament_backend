@@ -86,28 +86,16 @@ Toggles the confirmed status (true ↔ false).
 }
 ```
 
-### Delete Player
-```
-DELETE /api/players/:id
-Headers: X-API-Key: your-api-key
-```
-
-**Response:**
-```json
-{
-  "message": "Player deleted successfully"
-}
-```
-
 ## Usage Workflow
 
 1. **Initial Setup**: Run migration 011 to insert all 12 players with confirmed=true
 2. **Player Roster Management**: Use Flutter app's "Players Roster" page to:
    - View all players
    - Add new players
-   - Toggle confirmation status
-   - Delete players
+   - Toggle confirmation status (players are never deleted to maintain ID consistency for tracking records)
 3. **Fixture Generation**: When creating a fixture, it automatically uses only confirmed players from `/api/players/confirmed`
+
+**Note**: Players cannot be deleted to preserve unique IDs for historical record tracking. Use the confirmation toggle to mark players as inactive instead.
 
 ## Database Schema
 

@@ -51,7 +51,6 @@ func main() {
 
 		// Player management
 		protected.POST("/players", handlers.CreatePlayer)
-		protected.DELETE("/players/:id", handlers.DeletePlayer)
 		protected.PATCH("/players/:id/confirm", handlers.TogglePlayerConfirmed)
 		protected.GET("/players/confirmed", handlers.GetConfirmedPlayers)
 
