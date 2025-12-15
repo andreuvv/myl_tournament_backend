@@ -479,7 +479,7 @@ func ArchiveTournament(c *gin.Context) {
 		RETURNING id
 	`, req.Name, req.Month, req.Year, req.StartDate, req.EndDate).Scan(&tournamentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tournament"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tournament: " + err.Error()})
 		return
 	}
 
@@ -497,14 +497,14 @@ func ArchiveTournament(c *gin.Context) {
 	`
 	_, err = tx.Exec(standingsQuery, tournamentID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive standings"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive standings: " + err.Error()})
 		return
 	}
 
 	// Archive rounds and matches
 	roundsRows, err := tx.Query(`SELECT id, round_number, format FROM rounds ORDER BY round_number`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rounds"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rounds: " + err.Error()})
 		return
 	}
 	defer roundsRows.Close()
@@ -524,7 +524,8 @@ func ArchiveTournament(c *gin.Context) {
 			RETURNING id
 		`, tournamentID, roundNumber, format).Scan(&tournamentRoundID)
 		if err != nil {
-			continue
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tournament round: " + err.Error()})
+			return
 		}
 
 		// Archive matches for this round
@@ -534,15 +535,17 @@ func ArchiveTournament(c *gin.Context) {
 				score1, score2, completed
 			)
 			SELECT 
-				$1, m.player1_id, m.player2_id, p1.name, p2.name,
+				$1, m.player1_id, m.player2_id, 
+				COALESCE(p1.name, 'Unknown'), COALESCE(p2.name, 'Unknown'),
 				m.score1, m.score2, m.completed
 			FROM matches m
-			JOIN players p1 ON m.player1_id = p1.id
-			JOIN players p2 ON m.player2_id = p2.id
+			LEFT JOIN players p1 ON m.player1_id = p1.id
+			LEFT JOIN players p2 ON m.player2_id = p2.id
 			WHERE m.round_id = $2
 		`, tournamentRoundID, roundID)
 		if err != nil {
-			continue
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive matches: " + err.Error()})
+			return
 		}
 	}
 

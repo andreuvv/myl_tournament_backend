@@ -40,7 +40,7 @@ func main() {
 		public.GET("/fixture", handlers.GetFixture)
 		public.GET("/standings", handlers.GetStandings)
 		public.GET("/players", handlers.GetPlayers)
-		
+
 		// Tournament history (public access)
 		public.GET("/tournaments", handlers.GetTournaments)
 		public.GET("/tournaments/:id/standings", handlers.GetTournamentStandings)
@@ -64,7 +64,7 @@ func main() {
 
 		// Clear tournament data
 		protected.DELETE("/tournament", handlers.ClearTournament)
-		
+
 		// Tournament archiving
 		protected.POST("/tournaments/archive", handlers.ArchiveTournament)
 	}
