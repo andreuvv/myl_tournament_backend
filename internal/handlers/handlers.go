@@ -455,3 +455,258 @@ func GetConfirmedPlayers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, players)
 }
+
+// ArchiveTournament archives the current tournament data
+func ArchiveTournament(c *gin.Context) {
+	var req models.ArchiveTournamentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tx, err := database.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
+	// Create tournament record
+	var tournamentID int
+	err = tx.QueryRow(`
+		INSERT INTO tournaments (name, month, year, start_date, end_date)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id
+	`, req.Name, req.Month, req.Year, req.StartDate, req.EndDate).Scan(&tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tournament"})
+		return
+	}
+
+	// Archive current standings with position
+	standingsQuery := `
+		INSERT INTO tournament_standings (
+			tournament_id, player_id, player_name, matches_played, wins, ties, losses,
+			points, total_points_scored, total_matches, final_position
+		)
+		SELECT 
+			$1, id, name, matches_played, wins, ties, losses,
+			points, total_points_scored, total_matches,
+			ROW_NUMBER() OVER (ORDER BY points DESC, total_points_scored DESC) as position
+		FROM standings
+	`
+	_, err = tx.Exec(standingsQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive standings"})
+		return
+	}
+
+	// Archive rounds and matches
+	roundsRows, err := tx.Query(`SELECT id, round_number, format FROM rounds ORDER BY round_number`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rounds"})
+		return
+	}
+	defer roundsRows.Close()
+
+	for roundsRows.Next() {
+		var roundID, roundNumber int
+		var format string
+		if err := roundsRows.Scan(&roundID, &roundNumber, &format); err != nil {
+			continue
+		}
+
+		// Create tournament round
+		var tournamentRoundID int
+		err = tx.QueryRow(`
+			INSERT INTO tournament_rounds (tournament_id, round_number, format)
+			VALUES ($1, $2, $3)
+			RETURNING id
+		`, tournamentID, roundNumber, format).Scan(&tournamentRoundID)
+		if err != nil {
+			continue
+		}
+
+		// Archive matches for this round
+		_, err = tx.Exec(`
+			INSERT INTO tournament_matches (
+				tournament_round_id, player1_id, player2_id, player1_name, player2_name,
+				score1, score2, completed
+			)
+			SELECT 
+				$1, m.player1_id, m.player2_id, p1.name, p2.name,
+				m.score1, m.score2, m.completed
+			FROM matches m
+			JOIN players p1 ON m.player1_id = p1.id
+			JOIN players p2 ON m.player2_id = p2.id
+			WHERE m.round_id = $2
+		`, tournamentRoundID, roundID)
+		if err != nil {
+			continue
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit tournament archive"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "Tournament archived successfully",
+		"tournament_id": tournamentID,
+	})
+}
+
+// GetTournaments returns all archived tournaments
+func GetTournaments(c *gin.Context) {
+	query := `
+		SELECT id, name, month, year, start_date, end_date, created_at, archived_at
+		FROM tournaments
+		ORDER BY year DESC, 
+			CASE month
+				WHEN 'Enero' THEN 1 WHEN 'Febrero' THEN 2 WHEN 'Marzo' THEN 3
+				WHEN 'Abril' THEN 4 WHEN 'Mayo' THEN 5 WHEN 'Junio' THEN 6
+				WHEN 'Julio' THEN 7 WHEN 'Agosto' THEN 8 WHEN 'Septiembre' THEN 9
+				WHEN 'Octubre' THEN 10 WHEN 'Noviembre' THEN 11 WHEN 'Diciembre' THEN 12
+			END DESC
+	`
+
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tournaments"})
+		return
+	}
+	defer rows.Close()
+
+	tournaments := []models.Tournament{}
+	for rows.Next() {
+		var t models.Tournament
+		err := rows.Scan(&t.ID, &t.Name, &t.Month, &t.Year, &t.StartDate, &t.EndDate, &t.CreatedAt, &t.ArchivedAt)
+		if err != nil {
+			continue
+		}
+		tournaments = append(tournaments, t)
+	}
+
+	c.JSON(http.StatusOK, tournaments)
+}
+
+// GetTournamentStandings returns standings for a specific tournament
+func GetTournamentStandings(c *gin.Context) {
+	tournamentID := c.Param("id")
+
+	query := `
+		SELECT 
+			id, tournament_id, player_id, player_name, matches_played, wins, ties, losses,
+			points, total_points_scored, total_matches, final_position
+		FROM tournament_standings
+		WHERE tournament_id = $1
+		ORDER BY final_position ASC
+	`
+
+	rows, err := database.DB.Query(query, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tournament standings"})
+		return
+	}
+	defer rows.Close()
+
+	standings := []models.TournamentStanding{}
+	for rows.Next() {
+		var s models.TournamentStanding
+		err := rows.Scan(
+			&s.ID, &s.TournamentID, &s.PlayerID, &s.PlayerName, &s.MatchesPlayed,
+			&s.Wins, &s.Ties, &s.Losses, &s.Points, &s.TotalPointsScored,
+			&s.TotalMatches, &s.FinalPosition,
+		)
+		if err != nil {
+			continue
+		}
+		standings = append(standings, s)
+	}
+
+	c.JSON(http.StatusOK, standings)
+}
+
+// GetTournamentRounds returns rounds and matches for a specific tournament
+func GetTournamentRounds(c *gin.Context) {
+	tournamentID := c.Param("id")
+
+	// Get tournament name
+	var tournamentName string
+	err := database.DB.QueryRow(`SELECT name FROM tournaments WHERE id = $1`, tournamentID).Scan(&tournamentName)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Tournament not found"})
+		return
+	}
+
+	// Get rounds
+	roundsQuery := `
+		SELECT id, round_number, format
+		FROM tournament_rounds
+		WHERE tournament_id = $1
+		ORDER BY round_number
+	`
+
+	rows, err := database.DB.Query(roundsQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rounds"})
+		return
+	}
+	defer rows.Close()
+
+	roundsMap := make(map[int]*models.TournamentRoundDetail)
+
+	for rows.Next() {
+		var roundID, roundNumber int
+		var format string
+		err := rows.Scan(&roundID, &roundNumber, &format)
+		if err != nil {
+			continue
+		}
+
+		roundsMap[roundNumber] = &models.TournamentRoundDetail{
+			Number:  roundNumber,
+			Format:  format,
+			Matches: []models.TournamentMatchInfo{},
+		}
+
+		// Get matches for this round
+		matchesQuery := `
+			SELECT id, player1_name, player2_name, score1, score2, completed
+			FROM tournament_matches
+			WHERE tournament_round_id = $1
+			ORDER BY id
+		`
+
+		matchRows, err := database.DB.Query(matchesQuery, roundID)
+		if err != nil {
+			continue
+		}
+
+		for matchRows.Next() {
+			var match models.TournamentMatchInfo
+			err := matchRows.Scan(&match.ID, &match.Player1Name, &match.Player2Name, &match.Score1, &match.Score2, &match.Completed)
+			if err != nil {
+				continue
+			}
+			roundsMap[roundNumber].Matches = append(roundsMap[roundNumber].Matches, match)
+		}
+		matchRows.Close()
+	}
+
+	// Convert map to sorted slice
+	rounds := []models.TournamentRoundDetail{}
+	for i := 1; i <= len(roundsMap); i++ {
+		if round, exists := roundsMap[i]; exists {
+			rounds = append(rounds, *round)
+		}
+	}
+
+	response := models.TournamentRoundsResponse{
+		TournamentName: tournamentName,
+		Rounds:         rounds,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
