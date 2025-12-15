@@ -1,0 +1,408 @@
+{
+	"info": {
+		"_postman_id": "premier-mitologico-api",
+		"name": "Premier Mitológico API",
+		"description": "Complete API collection for Premier Mitológico tournament management system. Includes all public and protected endpoints for managing players, fixtures, matches, standings, and tournament archives.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "premier-mitologico"
+	},
+	"item": [
+		{
+			"name": "Health & Status",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": ["{{base_url}}"],
+							"path": ["health"]
+						},
+						"description": "Check if the API server is running and healthy."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Public Endpoints",
+			"item": [
+				{
+					"name": "Get Fixture",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/fixture",
+							"host": ["{{base_url}}"],
+							"path": ["api", "fixture"]
+						},
+						"description": "Retrieve the complete tournament fixture with all rounds and matches. Returns rounds sorted by number with their associated matches."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Standings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/standings",
+							"host": ["{{base_url}}"],
+							"path": ["api", "standings"]
+						},
+						"description": "Retrieve current tournament standings (leaderboard). Results are sorted by points (descending), then total_points_scored (descending)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Players",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/players",
+							"host": ["{{base_url}}"],
+							"path": ["api", "players"]
+						},
+						"description": "Retrieve all registered players with their confirmation status."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Tournament History",
+			"item": [
+				{
+					"name": "Get Tournaments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/tournaments",
+							"host": ["{{base_url}}"],
+							"path": ["api", "tournaments"]
+						},
+						"description": "Retrieve list of all archived tournaments. Results are sorted by year (descending), then month (descending)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tournament Standings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/tournaments/:id/standings",
+							"host": ["{{base_url}}"],
+							"path": ["api", "tournaments", ":id", "standings"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Tournament ID"
+								}
+							]
+						},
+						"description": "Retrieve final standings for a specific archived tournament. Replace :id with the tournament ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Tournament Rounds",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/tournaments/:id/rounds",
+							"host": ["{{base_url}}"],
+							"path": ["api", "tournaments", ":id", "rounds"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Tournament ID"
+								}
+							]
+						},
+						"description": "Retrieve all rounds and matches for a specific archived tournament. Replace :id with the tournament ID."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Player Management (Protected)",
+			"item": [
+				{
+					"name": "Create Player",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"New Player Name\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/players",
+							"host": ["{{base_url}}"],
+							"path": ["api", "players"]
+						},
+						"description": "Add a new player to the roster. Requires API key authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Toggle Player Confirmed",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/players/:id/confirm",
+							"host": ["{{base_url}}"],
+							"path": ["api", "players", ":id", "confirm"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Player ID"
+								}
+							]
+						},
+						"description": "Toggle a player's confirmation status for the tournament. Replace :id with the player ID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Confirmed Players",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/players/confirmed",
+							"host": ["{{base_url}}"],
+							"path": ["api", "players", "confirmed"]
+						},
+						"description": "Retrieve only players who are confirmed for the tournament. Requires API key authentication."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Tournament Management (Protected)",
+			"item": [
+				{
+					"name": "Create Fixture",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"rounds\": [\n    {\n      \"format\": \"PB\",\n      \"pairings\": [\n        { \"player1_id\": 1, \"player2_id\": 2 },\n        { \"player1_id\": 3, \"player2_id\": 4 }\n      ]\n    },\n    {\n      \"format\": \"BF\",\n      \"pairings\": [\n        { \"player1_id\": 1, \"player2_id\": 3 },\n        { \"player1_id\": 2, \"player2_id\": 4 }\n      ]\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/fixture",
+							"host": ["{{base_url}}"],
+							"path": ["api", "fixture"]
+						},
+						"description": "Generate the complete tournament fixture with all rounds and matches. Creates rounds sequentially and validates player IDs. Format codes: 'PB' = Primer Bloque, 'BF' = Bloque Furia."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Match Score",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"score1\": 2,\n  \"score2\": 1\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/matches/:id/score",
+							"host": ["{{base_url}}"],
+							"path": ["api", "matches", ":id", "score"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1",
+									"description": "Match ID"
+								}
+							]
+						},
+						"description": "Update the score for a specific match. Valid scores are 0, 1, or 2 (Best of 3 format). Match is marked as completed when scores are updated. Automatically updates standings via database triggers."
+					},
+					"response": []
+				},
+				{
+					"name": "Archive Tournament",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Copa K&T Diciembre 2025\",\n  \"month\": \"Diciembre\",\n  \"year\": 2025,\n  \"start_date\": \"2025-12-13\",\n  \"end_date\": \"2025-12-13\",\n  \"clear_current\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/tournaments/archive",
+							"host": ["{{base_url}}"],
+							"path": ["api", "tournaments", "archive"]
+						},
+						"description": "Save the current tournament (standings and matches) to the archive. Optionally clear the active tournament after archiving by setting 'clear_current' to true. Requires all matches to be completed."
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Tournament (Keep Players)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clear_players\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/tournament",
+							"host": ["{{base_url}}"],
+							"path": ["api", "tournament"]
+						},
+						"description": "Delete all tournament data (matches, rounds) and reset player confirmations. Players remain in the roster but are set to unconfirmed. Use this to prepare for a new tournament."
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Tournament (Delete Players)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"clear_players\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/tournament",
+							"host": ["{{base_url}}"],
+							"path": ["api", "tournament"]
+						},
+						"description": "Delete all tournament data (matches, rounds) AND all player records. Use this for a complete reset. WARNING: This deletes all players permanently."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://your-api-domain.railway.app",
+			"type": "string"
+		},
+		{
+			"key": "api_key",
+			"value": "your-api-key-here",
+			"type": "string"
+		}
+	]
+}
