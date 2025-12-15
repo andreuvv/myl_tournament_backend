@@ -502,27 +502,40 @@ func ArchiveTournament(c *gin.Context) {
 	}
 
 	// Archive rounds and matches
+	// First, fetch all rounds into memory
+	type roundData struct {
+		ID     int
+		Number int
+		Format string
+	}
+	var rounds []roundData
+
 	roundsRows, err := tx.Query(`SELECT id, round_number, format FROM rounds ORDER BY round_number`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rounds: " + err.Error()})
 		return
 	}
-	defer roundsRows.Close()
 
 	for roundsRows.Next() {
-		var roundID, roundNumber int
-		var format string
-		if err := roundsRows.Scan(&roundID, &roundNumber, &format); err != nil {
-			continue
+		var r roundData
+		if err := roundsRows.Scan(&r.ID, &r.Number, &r.Format); err != nil {
+			roundsRows.Close()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan round: " + err.Error()})
+			return
 		}
+		rounds = append(rounds, r)
+	}
+	roundsRows.Close()
 
+	// Now process each round
+	for _, round := range rounds {
 		// Create tournament round
 		var tournamentRoundID int
 		err = tx.QueryRow(`
 			INSERT INTO tournament_rounds (tournament_id, round_number, format)
 			VALUES ($1, $2, $3)
 			RETURNING id
-		`, tournamentID, roundNumber, format).Scan(&tournamentRoundID)
+		`, tournamentID, round.Number, round.Format).Scan(&tournamentRoundID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tournament round: " + err.Error()})
 			return
@@ -542,7 +555,7 @@ func ArchiveTournament(c *gin.Context) {
 			LEFT JOIN players p1 ON m.player1_id = p1.id
 			LEFT JOIN players p2 ON m.player2_id = p2.id
 			WHERE m.round_id = $2
-		`, tournamentRoundID, roundID)
+		`, tournamentRoundID, round.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive matches: " + err.Error()})
 			return
