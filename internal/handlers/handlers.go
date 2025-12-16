@@ -726,3 +726,43 @@ func GetTournamentRounds(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// DeleteArchivedTournament deletes an archived tournament and all its associated data
+func DeleteArchivedTournament(c *gin.Context) {
+	tournamentID := c.Param("id")
+
+	tx, err := database.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
+	// Check if tournament exists
+	var exists bool
+	err = tx.QueryRow("SELECT EXISTS(SELECT 1 FROM tournaments WHERE id = $1)", tournamentID).Scan(&exists)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check tournament existence"})
+		return
+	}
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Tournament not found"})
+		return
+	}
+
+	// Delete tournament (CASCADE will handle related records)
+	_, err = tx.Exec("DELETE FROM tournaments WHERE id = $1", tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tournament"})
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit deletion"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Tournament deleted successfully",
+	})
+}

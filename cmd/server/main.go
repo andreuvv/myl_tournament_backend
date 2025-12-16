@@ -67,6 +67,7 @@ func main() {
 
 		// Tournament archiving
 		protected.POST("/tournaments/archive", handlers.ArchiveTournament)
+		protected.DELETE("/tournaments/:id", handlers.DeleteArchivedTournament)
 	}
 
 	// Health check
