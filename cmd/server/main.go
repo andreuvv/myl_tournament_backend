@@ -45,8 +45,8 @@ func main() {
 		public.GET("/tournaments", handlers.GetTournaments)
 		public.GET("/tournaments/:id/standings", handlers.GetTournamentStandings)
 		public.GET("/tournaments/:id/rounds", handlers.GetTournamentRounds)
-		public.GET("/tournaments/:tournament_id/players", handlers.GetArchivedTournamentPlayers)
-		public.GET("/tournaments/:tournament_id/player-races", handlers.GetTournamentPlayerRaces)
+		public.GET("/tournaments/:id/players", handlers.GetArchivedTournamentPlayers)
+		public.GET("/tournaments/:id/player-races", handlers.GetTournamentPlayerRaces)
 	}
 
 	// Protected routes (require API key)
@@ -72,7 +72,7 @@ func main() {
 		protected.DELETE("/tournaments/:id", handlers.DeleteArchivedTournament)
 
 		// Tournament player race tracking
-		protected.PATCH("/tournaments/:tournament_id/players/:player_id/race", handlers.UpdatePlayerRace)
+		protected.PATCH("/tournaments/:id/players/:player_id/race", handlers.UpdatePlayerRace)
 	}
 
 	// Health check

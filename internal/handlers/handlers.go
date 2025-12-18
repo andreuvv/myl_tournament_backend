@@ -594,7 +594,7 @@ func GetTournaments(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	tournaments := []models.Tournament{}
+	tournaments := make([]models.Tournament, 0)
 	for rows.Next() {
 		var t models.Tournament
 		err := rows.Scan(&t.ID, &t.Name, &t.Month, &t.Year, &t.StartDate, &t.EndDate, &t.CreatedAt, &t.ArchivedAt)
@@ -769,7 +769,7 @@ func DeleteArchivedTournament(c *gin.Context) {
 
 // GetTournamentPlayerRaces returns all players and their race selections for a specific tournament
 func GetTournamentPlayerRaces(c *gin.Context) {
-	tournamentID := c.Param("tournament_id")
+	tournamentID := c.Param("id")
 
 	query := `
 		SELECT 
@@ -828,7 +828,7 @@ func GetTournamentPlayerRaces(c *gin.Context) {
 
 // UpdatePlayerRace updates race selections for a player in a specific tournament
 func UpdatePlayerRace(c *gin.Context) {
-	tournamentID := c.Param("tournament_id")
+	tournamentID := c.Param("id")
 	playerID := c.Param("player_id")
 
 	var req models.UpdatePlayerRaceRequest
@@ -881,7 +881,7 @@ func UpdatePlayerRace(c *gin.Context) {
 
 // GetArchivedTournamentPlayers returns all players who participated in a specific archived tournament
 func GetArchivedTournamentPlayers(c *gin.Context) {
-	tournamentID := c.Param("tournament_id")
+	tournamentID := c.Param("id")
 
 	query := `
 		SELECT DISTINCT
