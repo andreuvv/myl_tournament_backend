@@ -25,6 +25,11 @@ type PlayerTournamentHistory struct {
 	TotalPointsScored int     `json:"total_points_scored"`
 	RacePB            *string `json:"race_pb"`
 	RaceBF            *string `json:"race_bf"`
+	// Win data by format from actual match results
+	PBWins    int `json:"pb_wins"`
+	PBMatches int `json:"pb_matches"`
+	BFWins    int `json:"bf_wins"`
+	BFMatches int `json:"bf_matches"`
 }
 
 // GetPlayerTournamentHistory returns all tournament history for a specific player
@@ -39,7 +44,7 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 		return
 	}
 
-	// Get all tournaments where the player participated along with standings and races
+	// Get all tournaments where the player participated, including match data by format
 	query := `
 		SELECT 
 			t.id,
@@ -54,11 +59,36 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 			ts.points,
 			ts.total_points_scored,
 			tpr.race_pb,
-			tpr.race_bf
+			tpr.race_bf,
+			-- Count wins in PB format
+			COALESCE(SUM(CASE 
+				WHEN tr.format = 'PB' AND tm.completed = true AND (
+					(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
+					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
+				) THEN 1 ELSE 0 
+			END), 0) as pb_wins,
+			-- Count total matches in PB format
+			COALESCE(SUM(CASE 
+				WHEN tr.format = 'PB' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
+			END), 0) as pb_matches,
+			-- Count wins in BF format
+			COALESCE(SUM(CASE 
+				WHEN tr.format = 'BF' AND tm.completed = true AND (
+					(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
+					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
+				) THEN 1 ELSE 0 
+			END), 0) as bf_wins,
+			-- Count total matches in BF format
+			COALESCE(SUM(CASE 
+				WHEN tr.format = 'BF' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
+			END), 0) as bf_matches
 		FROM tournaments t
 		INNER JOIN tournament_standings ts ON t.id = ts.tournament_id
 		LEFT JOIN tournament_player_races tpr ON t.id = tpr.tournament_id AND ts.player_id = tpr.player_id
+		LEFT JOIN tournament_rounds tr ON t.id = tr.tournament_id
+		LEFT JOIN tournament_matches tm ON tr.id = tm.tournament_round_id
 		WHERE ts.player_id = $1
+		GROUP BY t.id, t.name, t.month, t.year, ts.id, tpr.race_pb, tpr.race_bf
 		ORDER BY t.year DESC, t.month DESC
 	`
 
@@ -91,6 +121,10 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 			&h.TotalPointsScored,
 			&racePB,
 			&raceBF,
+			&h.PBWins,
+			&h.PBMatches,
+			&h.BFWins,
+			&h.BFMatches,
 		)
 		if err != nil {
 			continue
