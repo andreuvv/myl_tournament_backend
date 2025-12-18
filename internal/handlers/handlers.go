@@ -905,18 +905,16 @@ func GetArchivedTournamentPlayers(c *gin.Context) {
 	}
 
 	query := `
-		SELECT DISTINCT
-			p.id,
-			p.name,
-			ts.total_matches,
-			ts.total_wins,
-			ts.total_ties,
-			ts.total_points_scored
-		FROM tournament_matches tm
-		JOIN players p ON (tm.player1_id = p.id OR tm.player2_id = p.id)
-		LEFT JOIN tournament_standings ts ON ts.tournament_id = tm.tournament_id AND ts.player_id = p.id
-		WHERE tm.tournament_id = $1
-		ORDER BY p.name
+		SELECT 
+			player_id as id,
+			player_name as name,
+			total_matches,
+			total_wins,
+			total_ties,
+			total_points_scored
+		FROM tournament_standings
+		WHERE tournament_id = $1
+		ORDER BY player_name
 	`
 
 	rows, err := database.DB.Query(query, tournamentID)
