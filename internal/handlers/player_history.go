@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -29,8 +30,11 @@ type PlayerTournamentHistory struct {
 // GetPlayerTournamentHistory returns all tournament history for a specific player
 func GetPlayerTournamentHistory(c *gin.Context) {
 	playerIDStr := c.Param("player_id")
+	fmt.Println("GetPlayerTournamentHistory called with player_id:", playerIDStr)
+
 	playerID, err := strconv.Atoi(playerIDStr)
 	if err != nil {
+		fmt.Println("Error converting player_id to int:", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid player ID"})
 		return
 	}
@@ -60,6 +64,7 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 
 	rows, err := database.DB.Query(query, playerID)
 	if err != nil {
+		fmt.Println("Database query error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch player tournament history"})
 		return
 	}
