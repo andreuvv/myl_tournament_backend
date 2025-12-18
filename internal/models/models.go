@@ -173,3 +173,21 @@ type TournamentRoundsResponse struct {
 	TournamentName string                  `json:"tournament_name"`
 	Rounds         []TournamentRoundDetail `json:"rounds"`
 }
+
+type TournamentPlayerRace struct {
+	ID           int       `json:"id"`
+	TournamentID int       `json:"tournament_id"`
+	PlayerID     int       `json:"player_id"`
+	PlayerName   string    `json:"player_name"`
+	RacePB       *string   `json:"race_pb"`
+	RaceBF       *string   `json:"race_bf"`
+	Notes        *string   `json:"notes"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type UpdatePlayerRaceRequest struct {
+	RacePB *string `json:"race_pb"`
+	RaceBF *string `json:"race_bf"`
+	Notes  *string `json:"notes"`
+}

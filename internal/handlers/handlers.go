@@ -766,3 +766,178 @@ func DeleteArchivedTournament(c *gin.Context) {
 		"message": "Tournament deleted successfully",
 	})
 }
+
+// GetTournamentPlayerRaces returns all players and their race selections for a specific tournament
+func GetTournamentPlayerRaces(c *gin.Context) {
+	tournamentID := c.Param("tournament_id")
+
+	query := `
+		SELECT 
+			tpr.id,
+			tpr.tournament_id,
+			tpr.player_id,
+			p.name as player_name,
+			tpr.race_pb,
+			tpr.race_bf,
+			tpr.notes,
+			tpr.created_at,
+			tpr.updated_at
+		FROM tournament_player_races tpr
+		LEFT JOIN players p ON tpr.player_id = p.id
+		WHERE tpr.tournament_id = $1
+		ORDER BY p.name
+	`
+
+	rows, err := database.DB.Query(query, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch player races"})
+		return
+	}
+	defer rows.Close()
+
+	var playerRaces []models.TournamentPlayerRace
+
+	for rows.Next() {
+		var pr models.TournamentPlayerRace
+
+		err := rows.Scan(
+			&pr.ID,
+			&pr.TournamentID,
+			&pr.PlayerID,
+			&pr.PlayerName,
+			&pr.RacePB,
+			&pr.RaceBF,
+			&pr.Notes,
+			&pr.CreatedAt,
+			&pr.UpdatedAt,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error scanning player races"})
+			return
+		}
+
+		playerRaces = append(playerRaces, pr)
+	}
+
+	if playerRaces == nil {
+		playerRaces = []models.TournamentPlayerRace{}
+	}
+
+	c.JSON(http.StatusOK, playerRaces)
+}
+
+// UpdatePlayerRace updates race selections for a player in a specific tournament
+func UpdatePlayerRace(c *gin.Context) {
+	tournamentID := c.Param("tournament_id")
+	playerID := c.Param("player_id")
+
+	var req models.UpdatePlayerRaceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	// Check if record exists, if not create it
+	var exists bool
+	err := database.DB.QueryRow(
+		"SELECT EXISTS(SELECT 1 FROM tournament_player_races WHERE tournament_id = $1 AND player_id = $2)",
+		tournamentID, playerID,
+	).Scan(&exists)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check existing record"})
+		return
+	}
+
+	var query string
+	var args []interface{}
+
+	if exists {
+		// Update existing record
+		query = `
+			UPDATE tournament_player_races 
+			SET race_pb = $1, race_bf = $2, notes = $3, updated_at = CURRENT_TIMESTAMP
+			WHERE tournament_id = $4 AND player_id = $5
+		`
+		args = []interface{}{req.RacePB, req.RaceBF, req.Notes, tournamentID, playerID}
+	} else {
+		// Insert new record
+		query = `
+			INSERT INTO tournament_player_races (tournament_id, player_id, race_pb, race_bf, notes)
+			VALUES ($1, $2, $3, $4, $5)
+		`
+		args = []interface{}{tournamentID, playerID, req.RacePB, req.RaceBF, req.Notes}
+	}
+
+	_, err = database.DB.Exec(query, args...)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update player race"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Player race updated successfully",
+	})
+}
+
+// GetArchivedTournamentPlayers returns all players who participated in a specific archived tournament
+func GetArchivedTournamentPlayers(c *gin.Context) {
+	tournamentID := c.Param("tournament_id")
+
+	query := `
+		SELECT DISTINCT
+			p.id,
+			p.name,
+			ts.total_matches,
+			ts.total_wins,
+			ts.total_ties,
+			ts.total_points_scored
+		FROM tournament_matches tm
+		JOIN players p ON (tm.player1_id = p.id OR tm.player2_id = p.id)
+		LEFT JOIN tournament_standings ts ON ts.tournament_id = tm.tournament_id AND ts.player_id = p.id
+		WHERE tm.tournament_id = $1
+		ORDER BY p.name
+	`
+
+	rows, err := database.DB.Query(query, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tournament players"})
+		return
+	}
+	defer rows.Close()
+
+	type PlayerInfo struct {
+		ID                int    `json:"id"`
+		Name              string `json:"name"`
+		TotalMatches      int    `json:"total_matches"`
+		TotalWins         int    `json:"total_wins"`
+		TotalTies         int    `json:"total_ties"`
+		TotalPointsScored int    `json:"total_points_scored"`
+	}
+
+	var players []PlayerInfo
+
+	for rows.Next() {
+		var p PlayerInfo
+
+		err := rows.Scan(
+			&p.ID,
+			&p.Name,
+			&p.TotalMatches,
+			&p.TotalWins,
+			&p.TotalTies,
+			&p.TotalPointsScored,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Error scanning players"})
+			return
+		}
+
+		players = append(players, p)
+	}
+
+	if players == nil {
+		players = []PlayerInfo{}
+	}
+
+	c.JSON(http.StatusOK, players)
+}
