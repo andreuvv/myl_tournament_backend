@@ -27,8 +27,10 @@ type PlayerTournamentHistory struct {
 	RaceBF            *string `json:"race_bf"`
 	// Win data by format from actual match results
 	PBWins    int `json:"pb_wins"`
+	PBTies    int `json:"pb_ties"`
 	PBMatches int `json:"pb_matches"`
 	BFWins    int `json:"bf_wins"`
+	BFTies    int `json:"bf_ties"`
 	BFMatches int `json:"bf_matches"`
 }
 
@@ -67,6 +69,10 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
 				) THEN 1 ELSE 0 
 			END), 0) as pb_wins,
+			-- Count ties in PB format
+			COALESCE(SUM(CASE 
+				WHEN tr.format = 'PB' AND tm.completed = true AND tm.score1 = tm.score2 THEN 1 ELSE 0 
+			END), 0) as pb_ties,
 			-- Count total matches in PB format
 			COALESCE(SUM(CASE 
 				WHEN tr.format = 'PB' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
@@ -78,6 +84,10 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
 				) THEN 1 ELSE 0 
 			END), 0) as bf_wins,
+			-- Count ties in BF format
+			COALESCE(SUM(CASE 
+				WHEN tr.format = 'BF' AND tm.completed = true AND tm.score1 = tm.score2 THEN 1 ELSE 0 
+			END), 0) as bf_ties,
 			-- Count total matches in BF format
 			COALESCE(SUM(CASE 
 				WHEN tr.format = 'BF' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
@@ -122,8 +132,10 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 			&racePB,
 			&raceBF,
 			&h.PBWins,
+			&h.PBTies,
 			&h.PBMatches,
 			&h.BFWins,
+			&h.BFTies,
 			&h.BFMatches,
 		)
 		if err != nil {
