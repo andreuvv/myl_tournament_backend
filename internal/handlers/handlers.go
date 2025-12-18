@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/andreuvv/premier_mitologico/backend/internal/database"
 	"github.com/andreuvv/premier_mitologico/backend/internal/models"
@@ -769,7 +770,12 @@ func DeleteArchivedTournament(c *gin.Context) {
 
 // GetTournamentPlayerRaces returns all players and their race selections for a specific tournament
 func GetTournamentPlayerRaces(c *gin.Context) {
-	tournamentID := c.Param("id")
+	tournamentIDStr := c.Param("id")
+	tournamentID, err := strconv.Atoi(tournamentIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tournament ID"})
+		return
+	}
 
 	query := `
 		SELECT 
@@ -828,8 +834,18 @@ func GetTournamentPlayerRaces(c *gin.Context) {
 
 // UpdatePlayerRace updates race selections for a player in a specific tournament
 func UpdatePlayerRace(c *gin.Context) {
-	tournamentID := c.Param("id")
-	playerID := c.Param("player_id")
+	tournamentIDStr := c.Param("id")
+	tournamentID, err := strconv.Atoi(tournamentIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tournament ID"})
+		return
+	}
+	playerIDStr := c.Param("player_id")
+	playerID, err := strconv.Atoi(playerIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid player ID"})
+		return
+	}
 
 	var req models.UpdatePlayerRaceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -839,7 +855,7 @@ func UpdatePlayerRace(c *gin.Context) {
 
 	// Check if record exists, if not create it
 	var exists bool
-	err := database.DB.QueryRow(
+	err = database.DB.QueryRow(
 		"SELECT EXISTS(SELECT 1 FROM tournament_player_races WHERE tournament_id = $1 AND player_id = $2)",
 		tournamentID, playerID,
 	).Scan(&exists)
@@ -881,7 +897,12 @@ func UpdatePlayerRace(c *gin.Context) {
 
 // GetArchivedTournamentPlayers returns all players who participated in a specific archived tournament
 func GetArchivedTournamentPlayers(c *gin.Context) {
-	tournamentID := c.Param("id")
+	tournamentIDStr := c.Param("id")
+	tournamentID, err := strconv.Atoi(tournamentIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tournament ID"})
+		return
+	}
 
 	query := `
 		SELECT DISTINCT
