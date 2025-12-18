@@ -909,8 +909,8 @@ func GetArchivedTournamentPlayers(c *gin.Context) {
 			player_id as id,
 			player_name as name,
 			total_matches,
-			total_wins,
-			total_ties,
+			wins as total_wins,
+			ties as total_ties,
 			total_points_scored
 		FROM tournament_standings
 		WHERE tournament_id = $1
