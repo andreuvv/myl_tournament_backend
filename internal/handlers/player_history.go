@@ -70,7 +70,7 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 				) THEN 1 ELSE 0 
 			END), 0) as pb_wins,
 			COALESCE(SUM(CASE 
-				WHEN tr.format = 'PB' AND tm.completed = true AND tm.score1 = tm.score2 THEN 1 ELSE 0 
+				WHEN tr.format = 'PB' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
 			END), 0) as pb_ties,
 			COALESCE(SUM(CASE 
 				WHEN tr.format = 'PB' AND tm.completed = true AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
@@ -83,7 +83,7 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 				) THEN 1 ELSE 0 
 			END), 0) as bf_wins,
 			COALESCE(SUM(CASE 
-				WHEN tr.format = 'BF' AND tm.completed = true AND tm.score1 = tm.score2 THEN 1 ELSE 0 
+				WHEN tr.format = 'BF' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
 			END), 0) as bf_ties,
 			COALESCE(SUM(CASE 
 				WHEN tr.format = 'BF' AND tm.completed = true AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
