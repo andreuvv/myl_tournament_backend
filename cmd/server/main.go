@@ -39,6 +39,9 @@ func main() {
 	{
 		public.GET("/fixture", handlers.GetFixture)
 		public.GET("/standings", handlers.GetStandings)
+
+		// Player routes (more specific first)
+		public.GET("/players/:player_id/tournaments", handlers.GetPlayerTournamentHistory)
 		public.GET("/players", handlers.GetPlayers)
 
 		// Tournament history (public access)
@@ -47,9 +50,6 @@ func main() {
 		public.GET("/tournaments/:id/rounds", handlers.GetTournamentRounds)
 		public.GET("/tournaments/:id/players", handlers.GetArchivedTournamentPlayers)
 		public.GET("/tournaments/:id/player-races", handlers.GetTournamentPlayerRaces)
-
-		// Player tournament history
-		public.GET("/players/:player_id/tournaments", handlers.GetPlayerTournamentHistory)
 	}
 
 	// Protected routes (require API key)
