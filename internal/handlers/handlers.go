@@ -791,13 +791,14 @@ func GetTournamentRaces(c *gin.Context) {
 	pbWinrateQuery := `
 		SELECT tpr.race_pb, COUNT(*) as total_matches, 
 		       SUM(CASE 
-		             WHEN m.winner_id = tpr.player_id THEN 1 
-		             WHEN m.score1 = m.score2 THEN 0.5 
+		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
 		             ELSE 0 
 		           END) as win_points
 		FROM tournament_player_races tpr
 		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN matches m ON m.round_id = tr.id AND m.format = 'PB'
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB'
 		WHERE tpr.tournament_id = $1 AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
 		GROUP BY tpr.race_pb
 	`
@@ -829,13 +830,14 @@ func GetTournamentRaces(c *gin.Context) {
 	bfWinrateQuery := `
 		SELECT tpr.race_bf, COUNT(*) as total_matches, 
 		       SUM(CASE 
-		             WHEN m.winner_id = tpr.player_id THEN 1 
-		             WHEN m.score1 = m.score2 THEN 0.5 
+		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
 		             ELSE 0 
 		           END) as win_points
 		FROM tournament_player_races tpr
 		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN matches m ON m.round_id = tr.id AND m.format = 'BF'
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF'
 		WHERE tpr.tournament_id = $1 AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
 		GROUP BY tpr.race_bf
 	`
