@@ -48,6 +48,7 @@ func main() {
 		public.GET("/tournaments", handlers.GetTournaments)
 		public.GET("/tournaments/:id/standings", handlers.GetTournamentStandings)
 		public.GET("/tournaments/:id/rounds", handlers.GetTournamentRounds)
+		public.GET("/tournaments/:id/races", handlers.GetTournamentRaces)
 		public.GET("/tournaments/:id/players", handlers.GetArchivedTournamentPlayers)
 		public.GET("/tournaments/:id/player-races", handlers.GetTournamentPlayerRaces)
 	}

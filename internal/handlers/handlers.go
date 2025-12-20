@@ -729,6 +729,72 @@ func GetTournamentRounds(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// GetTournamentRaces returns race statistics for a specific tournament
+func GetTournamentRaces(c *gin.Context) {
+	tournamentID := c.Param("id")
+
+	// Get PB race counts
+	pbQuery := `
+		SELECT race_pb, COUNT(*) as count
+		FROM tournament_player_races
+		WHERE tournament_id = $1 AND race_pb IS NOT NULL AND race_pb != ''
+		GROUP BY race_pb
+		ORDER BY count DESC
+	`
+
+	pbRows, err := database.DB.Query(pbQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch PB races"})
+		return
+	}
+	defer pbRows.Close()
+
+	pbRaces := make(map[string]int)
+	for pbRows.Next() {
+		var race string
+		var count int
+		err := pbRows.Scan(&race, &count)
+		if err != nil {
+			continue
+		}
+		pbRaces[race] = count
+	}
+
+	// Get BF race counts
+	bfQuery := `
+		SELECT race_bf, COUNT(*) as count
+		FROM tournament_player_races
+		WHERE tournament_id = $1 AND race_bf IS NOT NULL AND race_bf != ''
+		GROUP BY race_bf
+		ORDER BY count DESC
+	`
+
+	bfRows, err := database.DB.Query(bfQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch BF races"})
+		return
+	}
+	defer bfRows.Close()
+
+	bfRaces := make(map[string]int)
+	for bfRows.Next() {
+		var race string
+		var count int
+		err := bfRows.Scan(&race, &count)
+		if err != nil {
+			continue
+		}
+		bfRaces[race] = count
+	}
+
+	response := gin.H{
+		"pb_races": pbRaces,
+		"bf_races": bfRaces,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 // DeleteArchivedTournament deletes an archived tournament and all its associated data
 func DeleteArchivedTournament(c *gin.Context) {
 	tournamentID := c.Param("id")
