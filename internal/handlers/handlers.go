@@ -787,9 +787,87 @@ func GetTournamentRaces(c *gin.Context) {
 		bfRaces[race] = count
 	}
 
+	// Get PB race winrates
+	pbWinrateQuery := `
+		SELECT tpr.race_pb, COUNT(*) as total_matches, 
+		       SUM(CASE 
+		             WHEN m.winner_id = tpr.player_id THEN 1 
+		             WHEN m.score1 = m.score2 THEN 0.5 
+		             ELSE 0 
+		           END) as win_points
+		FROM tournament_player_races tpr
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN matches m ON m.round_id = tr.id AND m.format = 'PB'
+		WHERE tpr.tournament_id = $1 AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
+		GROUP BY tpr.race_pb
+	`
+
+	pbWinrateRows, err := database.DB.Query(pbWinrateQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch PB race winrates"})
+		return
+	}
+	defer pbWinrateRows.Close()
+
+	pbRaceWinrates := make(map[string]float64)
+	for pbWinrateRows.Next() {
+		var race string
+		var totalMatches int
+		var winPoints float64
+		err := pbWinrateRows.Scan(&race, &totalMatches, &winPoints)
+		if err != nil {
+			continue
+		}
+		if totalMatches > 0 {
+			pbRaceWinrates[race] = (winPoints * 100.0) / float64(totalMatches)
+		} else {
+			pbRaceWinrates[race] = 0.0
+		}
+	}
+
+	// Get BF race winrates
+	bfWinrateQuery := `
+		SELECT tpr.race_bf, COUNT(*) as total_matches, 
+		       SUM(CASE 
+		             WHEN m.winner_id = tpr.player_id THEN 1 
+		             WHEN m.score1 = m.score2 THEN 0.5 
+		             ELSE 0 
+		           END) as win_points
+		FROM tournament_player_races tpr
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN matches m ON m.round_id = tr.id AND m.format = 'BF'
+		WHERE tpr.tournament_id = $1 AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
+		GROUP BY tpr.race_bf
+	`
+
+	bfWinrateRows, err := database.DB.Query(bfWinrateQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch BF race winrates"})
+		return
+	}
+	defer bfWinrateRows.Close()
+
+	bfRaceWinrates := make(map[string]float64)
+	for bfWinrateRows.Next() {
+		var race string
+		var totalMatches int
+		var winPoints float64
+		err := bfWinrateRows.Scan(&race, &totalMatches, &winPoints)
+		if err != nil {
+			continue
+		}
+		if totalMatches > 0 {
+			bfRaceWinrates[race] = (winPoints * 100.0) / float64(totalMatches)
+		} else {
+			bfRaceWinrates[race] = 0.0
+		}
+	}
+
 	response := gin.H{
-		"pb_races": pbRaces,
-		"bf_races": bfRaces,
+		"pb_races":         pbRaces,
+		"bf_races":         bfRaces,
+		"pb_race_winrates": pbRaceWinrates,
+		"bf_race_winrates": bfRaceWinrates,
 	}
 
 	c.JSON(http.StatusOK, response)
