@@ -798,7 +798,7 @@ func GetTournamentRaces(c *gin.Context) {
 		           END) as win_points
 		FROM tournament_player_races tpr
 		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB'
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 		WHERE tpr.tournament_id = $1 AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
 		GROUP BY tpr.race_pb
 	`
@@ -837,7 +837,7 @@ func GetTournamentRaces(c *gin.Context) {
 		           END) as win_points
 		FROM tournament_player_races tpr
 		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF'
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 		WHERE tpr.tournament_id = $1 AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
 		GROUP BY tpr.race_bf
 	`
