@@ -111,18 +111,20 @@ type Tournament struct {
 }
 
 type TournamentStanding struct {
-	ID                int    `json:"id"`
-	TournamentID      int    `json:"tournament_id"`
-	PlayerID          int    `json:"player_id"`
-	PlayerName        string `json:"player_name"`
-	MatchesPlayed     int    `json:"matches_played"`
-	Wins              int    `json:"wins"`
-	Ties              int    `json:"ties"`
-	Losses            int    `json:"losses"`
-	Points            int    `json:"points"`
-	TotalPointsScored int    `json:"total_points_scored"`
-	TotalMatches      int    `json:"total_matches"`
-	FinalPosition     int    `json:"final_position"`
+	ID                int     `json:"id"`
+	TournamentID      int     `json:"tournament_id"`
+	PlayerID          int     `json:"player_id"`
+	PlayerName        string  `json:"player_name"`
+	MatchesPlayed     int     `json:"matches_played"`
+	Wins              int     `json:"wins"`
+	Ties              int     `json:"ties"`
+	Losses            int     `json:"losses"`
+	Points            int     `json:"points"`
+	TotalPointsScored int     `json:"total_points_scored"`
+	TotalMatches      int     `json:"total_matches"`
+	FinalPosition     int     `json:"final_position"`
+	RacePB            *string `json:"race_pb"`
+	RaceBF            *string `json:"race_bf"`
 }
 
 type TournamentRound struct {

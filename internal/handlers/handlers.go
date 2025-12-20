@@ -614,10 +614,11 @@ func GetTournamentStandings(c *gin.Context) {
 
 	query := `
 		SELECT 
-			id, tournament_id, player_id, player_name, matches_played, wins, ties, losses,
-			points, total_points_scored, total_matches, final_position
-		FROM tournament_standings
-		WHERE tournament_id = $1
+			ts.id, ts.tournament_id, ts.player_id, ts.player_name, ts.matches_played, ts.wins, ts.ties, ts.losses,
+			ts.points, ts.total_points_scored, ts.total_matches, ts.final_position, tpr.race_pb, tpr.race_bf
+		FROM tournament_standings ts
+		LEFT JOIN tournament_player_races tpr ON ts.tournament_id = tpr.tournament_id AND ts.player_id = tpr.player_id
+		WHERE ts.tournament_id = $1
 		ORDER BY final_position ASC
 	`
 
@@ -634,7 +635,7 @@ func GetTournamentStandings(c *gin.Context) {
 		err := rows.Scan(
 			&s.ID, &s.TournamentID, &s.PlayerID, &s.PlayerName, &s.MatchesPlayed,
 			&s.Wins, &s.Ties, &s.Losses, &s.Points, &s.TotalPointsScored,
-			&s.TotalMatches, &s.FinalPosition,
+			&s.TotalMatches, &s.FinalPosition, &s.RacePB, &s.RaceBF,
 		)
 		if err != nil {
 			continue
