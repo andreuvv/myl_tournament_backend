@@ -32,3 +32,7 @@ Thumbs.db
 
 # Dependencies
 vendor/
+# Backups
+backups/
+backup_*.sh
+backup_*.bat
