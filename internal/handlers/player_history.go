@@ -56,15 +56,17 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 		return
 	}
 
-	// Try to get the player name from the active players table
+	// Try to get the player name from the active players table first
 	var pName string
 	err = database.DB.QueryRow("SELECT name FROM players WHERE id = $1", playerID).Scan(&pName)
 	if err != nil {
-		fmt.Println("Error getting player name from active players:", err)
-		// If not found in active players, try to use the ID as is for legacy support
-		// But this won't work for premier_players, so we need the name
-		c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
-		return
+		// If not found in active players, try premier_players table
+		err = database.DB.QueryRow("SELECT name FROM premier_players WHERE id = $1", playerID).Scan(&pName)
+		if err != nil {
+			fmt.Println("Error getting player name from either table:", err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
+			return
+		}
 	}
 
 	fetchPlayerTournamentHistory(c, pName)
