@@ -306,6 +306,34 @@ func CreateFixture(c *gin.Context) {
 		playerMap[p.Name] = playerID
 	}
 
+	// Check if BYE player is needed (look through matches for BYE)
+	needsByePlayer := false
+	for _, r := range req.Rounds {
+		for _, m := range r.Matches {
+			if m.Player1Name == "BYE" || m.Player2Name == "BYE" {
+				needsByePlayer = true
+				break
+			}
+		}
+		if needsByePlayer {
+			break
+		}
+	}
+
+	// Create virtual BYE player if needed
+	if needsByePlayer {
+		var byeID int
+		err := tx.QueryRow(
+			"INSERT INTO players (name, confirmed) VALUES ($1, $2) RETURNING id",
+			"BYE", false,
+		).Scan(&byeID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create BYE player"})
+			return
+		}
+		playerMap["BYE"] = byeID
+	}
+
 	// Create rounds and matches
 	for _, r := range req.Rounds {
 		var roundID int
