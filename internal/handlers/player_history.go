@@ -46,7 +46,18 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 		return
 	}
 
+	// First, get the player name from the active players table
+	var playerName string
+	err = database.DB.QueryRow("SELECT name FROM players WHERE id = $1", playerID).Scan(&playerName)
+	if err != nil {
+		fmt.Println("Error getting player name:", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
+		return
+	}
+
 	// Get all tournaments where the player participated, including match data by format
+	// Use player_name from tournament_standings instead of player_id for matching
+	// since player_id may be orphaned after removing foreign key constraints
 	query := `
 		SELECT 
 			t.id,
@@ -65,39 +76,39 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 			-- PB format statistics
 			COALESCE(SUM(CASE 
 				WHEN tr.format = 'PB' AND tm.completed = true AND (
-					(tm.player1_id = $1 AND tm.score1 > tm.score2) OR
-					(tm.player2_id = $1 AND tm.score2 > tm.score1)
+					(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
+					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
 				) THEN 1 ELSE 0 
 			END), 0) as pb_wins,
 			COALESCE(SUM(CASE 
-				WHEN tr.format = 'PB' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
+				WHEN tr.format = 'PB' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
 			END), 0) as pb_ties,
 			COALESCE(SUM(CASE 
-				WHEN tr.format = 'PB' AND tm.completed = true AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
+				WHEN tr.format = 'PB' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
 			END), 0) as pb_matches,
 			-- BF format statistics
 			COALESCE(SUM(CASE 
 				WHEN tr.format = 'BF' AND tm.completed = true AND (
-					(tm.player1_id = $1 AND tm.score1 > tm.score2) OR
-					(tm.player2_id = $1 AND tm.score2 > tm.score1)
+					(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
+					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
 				) THEN 1 ELSE 0 
 			END), 0) as bf_wins,
 			COALESCE(SUM(CASE 
-				WHEN tr.format = 'BF' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
+				WHEN tr.format = 'BF' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
 			END), 0) as bf_ties,
 			COALESCE(SUM(CASE 
-				WHEN tr.format = 'BF' AND tm.completed = true AND (tm.player1_id = $1 OR tm.player2_id = $1) THEN 1 ELSE 0 
+				WHEN tr.format = 'BF' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
 			END), 0) as bf_matches
 		FROM tournaments t
-		INNER JOIN tournament_standings ts ON t.id = ts.tournament_id AND ts.player_id = $1
-		LEFT JOIN tournament_player_races tpr ON t.id = tpr.tournament_id AND ts.player_id = tpr.player_id
+		INNER JOIN tournament_standings ts ON t.id = ts.tournament_id AND ts.player_name = $1
+		LEFT JOIN tournament_player_races tpr ON t.id = tpr.tournament_id AND tpr.player_name = ts.player_name
 		LEFT JOIN tournament_rounds tr ON t.id = tr.tournament_id
 		LEFT JOIN tournament_matches tm ON tr.id = tm.tournament_round_id
 		GROUP BY t.id, t.name, t.month, t.year, ts.id, tpr.race_pb, tpr.race_bf
 		ORDER BY t.year DESC, t.month DESC
 	`
 
-	rows, err := database.DB.Query(query, playerID)
+	rows, err := database.DB.Query(query, playerName)
 	if err != nil {
 		fmt.Println("Database query error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch player tournament history"})
