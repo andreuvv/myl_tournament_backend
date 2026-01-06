@@ -36,9 +36,19 @@ type PlayerTournamentHistory struct {
 
 // GetPlayerTournamentHistory returns all tournament history for a specific player
 func GetPlayerTournamentHistory(c *gin.Context) {
+	// Accept either player_id or player_name parameter
 	playerIDStr := c.Param("player_id")
-	fmt.Println("GetPlayerTournamentHistory called with player_id:", playerIDStr)
+	playerName := c.Query("name")
 
+	fmt.Println("GetPlayerTournamentHistory called with player_id:", playerIDStr, "player_name:", playerName)
+
+	// If player_name is provided as query param, use it directly
+	if playerName != "" {
+		fetchPlayerTournamentHistory(c, playerName)
+		return
+	}
+
+	// Otherwise, try to get player name from player ID
 	playerID, err := strconv.Atoi(playerIDStr)
 	if err != nil {
 		fmt.Println("Error converting player_id to int:", err)
@@ -46,14 +56,22 @@ func GetPlayerTournamentHistory(c *gin.Context) {
 		return
 	}
 
-	// First, get the player name from the active players table
-	var playerName string
-	err = database.DB.QueryRow("SELECT name FROM players WHERE id = $1", playerID).Scan(&playerName)
+	// Try to get the player name from the active players table
+	var pName string
+	err = database.DB.QueryRow("SELECT name FROM players WHERE id = $1", playerID).Scan(&pName)
 	if err != nil {
-		fmt.Println("Error getting player name:", err)
+		fmt.Println("Error getting player name from active players:", err)
+		// If not found in active players, try to use the ID as is for legacy support
+		// But this won't work for premier_players, so we need the name
 		c.JSON(http.StatusNotFound, gin.H{"error": "Player not found"})
 		return
 	}
+
+	fetchPlayerTournamentHistory(c, pName)
+}
+
+// Helper function to fetch tournament history by player name
+func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 
 	// Get all tournaments where the player participated, including match data by format
 	// Use player_name from tournament_standings instead of player_id for matching
