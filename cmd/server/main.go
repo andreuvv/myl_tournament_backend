@@ -42,6 +42,7 @@ func main() {
 
 		// Player routes (more specific first)
 		public.GET("/players/:player_id/tournaments", handlers.GetPlayerTournamentHistory)
+		public.GET("/premier-players", handlers.GetPremierPlayers)
 		public.GET("/players", handlers.GetPlayers)
 
 		// Tournament history (public access)

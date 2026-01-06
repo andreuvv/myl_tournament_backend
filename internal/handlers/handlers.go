@@ -1135,3 +1135,37 @@ func GetArchivedTournamentPlayers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, players)
 }
+
+// GetPremierPlayers returns all players from the premier_players table
+func GetPremierPlayers(c *gin.Context) {
+	query := `SELECT id, name FROM premier_players ORDER BY name`
+
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch players"})
+		return
+	}
+	defer rows.Close()
+
+	type SimplifiedPlayer struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+
+	players := []SimplifiedPlayer{}
+	for rows.Next() {
+		var id int
+		var name string
+		err := rows.Scan(&id, &name)
+		if err != nil {
+			continue
+		}
+		players = append(players, SimplifiedPlayer{ID: id, Name: name})
+	}
+
+	if players == nil {
+		players = []SimplifiedPlayer{}
+	}
+
+	c.JSON(http.StatusOK, players)
+}
