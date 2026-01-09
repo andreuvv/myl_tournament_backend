@@ -45,6 +45,10 @@ func main() {
 		public.GET("/premier-players", handlers.GetPremierPlayers)
 		public.GET("/players", handlers.GetPlayers)
 
+		// Global statistics (aggregated from all tournaments)
+		public.GET("/global-standings", handlers.GetGlobalStandings)
+		public.GET("/global-races", handlers.GetGlobalRaces)
+
 		// Tournament history (public access)
 		public.GET("/tournaments", handlers.GetTournaments)
 		public.GET("/tournaments/:id/standings", handlers.GetTournamentStandings)

@@ -1169,3 +1169,248 @@ func GetPremierPlayers(c *gin.Context) {
 
 	c.JSON(http.StatusOK, players)
 }
+
+// GetGlobalStandings returns aggregated standings from all archived tournaments
+func GetGlobalStandings(c *gin.Context) {
+	query := `
+		SELECT 
+			pp.id,
+			pp.name,
+			COALESCE(SUM(CASE WHEN ts.final_position = 1 THEN 1 ELSE 0 END), 0) as first_place_count,
+			COALESCE(SUM(CASE WHEN ts.final_position = 2 THEN 1 ELSE 0 END), 0) as second_place_count,
+			COALESCE(SUM(CASE WHEN ts.final_position = 3 THEN 1 ELSE 0 END), 0) as third_place_count,
+			(
+				SELECT race_pb
+				FROM tournament_player_races tpr
+				WHERE tpr.player_name = pp.name AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
+				GROUP BY race_pb
+				ORDER BY COUNT(*) DESC
+				LIMIT 1
+			) as most_played_race_pb,
+			(
+				SELECT race_bf
+				FROM tournament_player_races tpr
+				WHERE tpr.player_name = pp.name AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
+				GROUP BY race_bf
+				ORDER BY COUNT(*) DESC
+				LIMIT 1
+			) as most_played_race_bf,
+			COALESCE((
+				SELECT ROUND(SUM(CASE 
+					WHEN m.player1_id = pp.id AND m.score1 > m.score2 THEN 1
+					WHEN m.player2_id = pp.id AND m.score2 > m.score1 THEN 1
+					WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = pp.id OR m.player2_id = pp.id) THEN 0.5
+					ELSE 0 
+				END) * 100.0 / NULLIF(COUNT(*), 0), 1) 
+				FROM tournament_player_races tpr
+				JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+				JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = pp.id OR m.player2_id = pp.id)
+				WHERE tpr.player_name = pp.name AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
+			), 0) as winrate_pb,
+			COALESCE((
+				SELECT ROUND(SUM(CASE 
+					WHEN m.player1_id = pp.id AND m.score1 > m.score2 THEN 1
+					WHEN m.player2_id = pp.id AND m.score2 > m.score1 THEN 1
+					WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = pp.id OR m.player2_id = pp.id) THEN 0.5
+					ELSE 0 
+				END) * 100.0 / NULLIF(COUNT(*), 0), 1)
+				FROM tournament_player_races tpr
+				JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+				JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = pp.id OR m.player2_id = pp.id)
+				WHERE tpr.player_name = pp.name AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
+			), 0) as winrate_bf
+		FROM premier_players pp
+		LEFT JOIN tournament_standings ts ON ts.player_name = pp.name
+		GROUP BY pp.id, pp.name
+		ORDER BY first_place_count DESC, second_place_count DESC, third_place_count DESC
+	`
+
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch global standings"})
+		return
+	}
+	defer rows.Close()
+
+	type GlobalStanding struct {
+		PlayerID           int     `json:"player_id"`
+		PlayerName         string  `json:"player_name"`
+		FirstPlaceCount    int     `json:"first_place_count"`
+		SecondPlaceCount   int     `json:"second_place_count"`
+		ThirdPlaceCount    int     `json:"third_place_count"`
+		MostPlayedRacePB   *string `json:"most_played_race_pb"`
+		MostPlayedRaceBF   *string `json:"most_played_race_bf"`
+		WinratePB          float64 `json:"winrate_pb"`
+		WinateBF           float64 `json:"winrate_bf"`
+	}
+
+	standings := []GlobalStanding{}
+	for rows.Next() {
+		var s GlobalStanding
+		err := rows.Scan(
+			&s.PlayerID,
+			&s.PlayerName,
+			&s.FirstPlaceCount,
+			&s.SecondPlaceCount,
+			&s.ThirdPlaceCount,
+			&s.MostPlayedRacePB,
+			&s.MostPlayedRaceBF,
+			&s.WinratePB,
+			&s.WinateBF,
+		)
+		if err != nil {
+			continue
+		}
+		standings = append(standings, s)
+	}
+
+	if standings == nil {
+		standings = []GlobalStanding{}
+	}
+
+	c.JSON(http.StatusOK, standings)
+}
+
+// GetGlobalRaces returns aggregated race statistics from all archived tournaments
+func GetGlobalRaces(c *gin.Context) {
+	// Get PB race counts from all tournaments
+	pbQuery := `
+		SELECT race_pb, COUNT(*) as count
+		FROM tournament_player_races
+		WHERE race_pb IS NOT NULL AND race_pb != ''
+		GROUP BY race_pb
+		ORDER BY count DESC
+	`
+
+	pbRows, err := database.DB.Query(pbQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch global PB races"})
+		return
+	}
+	defer pbRows.Close()
+
+	pbRaces := make(map[string]int)
+	for pbRows.Next() {
+		var race string
+		var count int
+		err := pbRows.Scan(&race, &count)
+		if err != nil {
+			continue
+		}
+		pbRaces[race] = count
+	}
+
+	// Get BF race counts from all tournaments
+	bfQuery := `
+		SELECT race_bf, COUNT(*) as count
+		FROM tournament_player_races
+		WHERE race_bf IS NOT NULL AND race_bf != ''
+		GROUP BY race_bf
+		ORDER BY count DESC
+	`
+
+	bfRows, err := database.DB.Query(bfQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch global BF races"})
+		return
+	}
+	defer bfRows.Close()
+
+	bfRaces := make(map[string]int)
+	for bfRows.Next() {
+		var race string
+		var count int
+		err := bfRows.Scan(&race, &count)
+		if err != nil {
+			continue
+		}
+		bfRaces[race] = count
+	}
+
+	// Get PB race winrates from all tournaments
+	pbWinrateQuery := `
+		SELECT tpr.race_pb, COUNT(*) as total_matches, 
+		       SUM(CASE 
+		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+		             ELSE 0 
+		           END) as win_points
+		FROM tournament_player_races tpr
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+		WHERE tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
+		GROUP BY tpr.race_pb
+	`
+
+	pbWinrateRows, err := database.DB.Query(pbWinrateQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch global PB race winrates"})
+		return
+	}
+	defer pbWinrateRows.Close()
+
+	pbRaceWinrates := make(map[string]float64)
+	for pbWinrateRows.Next() {
+		var race string
+		var totalMatches int
+		var winPoints float64
+		err := pbWinrateRows.Scan(&race, &totalMatches, &winPoints)
+		if err != nil {
+			continue
+		}
+		if totalMatches > 0 {
+			pbRaceWinrates[race] = (winPoints * 100.0) / float64(totalMatches)
+		} else {
+			pbRaceWinrates[race] = 0.0
+		}
+	}
+
+	// Get BF race winrates from all tournaments
+	bfWinrateQuery := `
+		SELECT tpr.race_bf, COUNT(*) as total_matches, 
+		       SUM(CASE 
+		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+		             ELSE 0 
+		           END) as win_points
+		FROM tournament_player_races tpr
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+		WHERE tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
+		GROUP BY tpr.race_bf
+	`
+
+	bfWinrateRows, err := database.DB.Query(bfWinrateQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch global BF race winrates"})
+		return
+	}
+	defer bfWinrateRows.Close()
+
+	bfRaceWinrates := make(map[string]float64)
+	for bfWinrateRows.Next() {
+		var race string
+		var totalMatches int
+		var winPoints float64
+		err := bfWinrateRows.Scan(&race, &totalMatches, &winPoints)
+		if err != nil {
+			continue
+		}
+		if totalMatches > 0 {
+			bfRaceWinrates[race] = (winPoints * 100.0) / float64(totalMatches)
+		} else {
+			bfRaceWinrates[race] = 0.0
+		}
+	}
+
+	response := gin.H{
+		"pb_races":         pbRaces,
+		"bf_races":         bfRaces,
+		"pb_race_winrates": pbRaceWinrates,
+		"bf_race_winrates": bfRaceWinrates,
+	}
+
+	c.JSON(http.StatusOK, response)
+}
