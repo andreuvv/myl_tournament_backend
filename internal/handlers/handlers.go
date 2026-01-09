@@ -1201,11 +1201,9 @@ func GetGlobalStandings(c *gin.Context) {
 					WHEN m.player2_id = pp.id AND m.score2 > m.score1 THEN 1
 					WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = pp.id OR m.player2_id = pp.id) THEN 0.5
 					ELSE 0 
-				END) * 100.0 / NULLIF(COUNT(*), 0), 1) 
-				FROM tournament_player_races tpr
-				JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+				END) * 100.0 / NULLIF(COUNT(DISTINCT m.id), 0), 1) 
+				FROM tournament_rounds tr
 				JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = pp.id OR m.player2_id = pp.id)
-				WHERE tpr.player_id = pp.id AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
 			), 0) as winrate_pb,
 			COALESCE((
 				SELECT ROUND(SUM(CASE 
@@ -1213,11 +1211,9 @@ func GetGlobalStandings(c *gin.Context) {
 					WHEN m.player2_id = pp.id AND m.score2 > m.score1 THEN 1
 					WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = pp.id OR m.player2_id = pp.id) THEN 0.5
 					ELSE 0 
-				END) * 100.0 / NULLIF(COUNT(*), 0), 1)
-				FROM tournament_player_races tpr
-				JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+				END) * 100.0 / NULLIF(COUNT(DISTINCT m.id), 0), 1)
+				FROM tournament_rounds tr
 				JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = pp.id OR m.player2_id = pp.id)
-				WHERE tpr.player_id = pp.id AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
 			), 0) as winrate_bf
 		FROM premier_players pp
 		LEFT JOIN tournament_standings ts ON ts.player_name = pp.name
