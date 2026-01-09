@@ -1182,7 +1182,7 @@ func GetGlobalStandings(c *gin.Context) {
 			(
 				SELECT race_pb
 				FROM tournament_player_races tpr
-				WHERE tpr.player_id = pp.id AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
+				WHERE tpr.player_name = pp.name AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
 				GROUP BY race_pb
 				ORDER BY COUNT(*) DESC
 				LIMIT 1
@@ -1190,7 +1190,7 @@ func GetGlobalStandings(c *gin.Context) {
 			(
 				SELECT race_bf
 				FROM tournament_player_races tpr
-				WHERE tpr.player_id = pp.id AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
+				WHERE tpr.player_name = pp.name AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
 				GROUP BY race_bf
 				ORDER BY COUNT(*) DESC
 				LIMIT 1
