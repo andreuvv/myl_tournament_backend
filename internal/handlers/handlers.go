@@ -1198,36 +1198,64 @@ func GetGlobalStandings(c *gin.Context) {
 				ORDER BY COUNT(*) DESC
 				LIMIT 1
 			) as most_played_race_bf,
-			-- PB stats aggregated
-			COALESCE(SUM(CASE 
-				WHEN tr.format = 'PB' AND tm.completed = true AND (
-					(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
-					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
-				) THEN 1 ELSE 0 
-			END), 0) as pb_wins,
-			COALESCE(SUM(CASE 
-				WHEN tr.format = 'PB' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
-			END), 0) as pb_ties,
-			COALESCE(SUM(CASE 
-				WHEN tr.format = 'PB' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
-			END), 0) as pb_matches,
-			-- BF stats aggregated
-			COALESCE(SUM(CASE 
-				WHEN tr.format = 'BF' AND tm.completed = true AND (
-					(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
-					(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
-				) THEN 1 ELSE 0 
-			END), 0) as bf_wins,
-			COALESCE(SUM(CASE 
-				WHEN tr.format = 'BF' AND tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
-			END), 0) as bf_ties,
-			COALESCE(SUM(CASE 
-				WHEN tr.format = 'BF' AND tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
-			END), 0) as bf_matches
+			-- PB stats aggregated via subquery
+			(
+				SELECT COALESCE(SUM(CASE 
+					WHEN tm.completed = true AND (
+						(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
+						(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
+					) THEN 1 ELSE 0 
+				END), 0)
+				FROM tournament_rounds tr2
+				LEFT JOIN tournament_matches tm ON tr2.id = tm.tournament_round_id
+				WHERE tr2.tournament_id = ts.tournament_id AND tr2.format = 'PB' AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id)
+			) as pb_wins,
+			(
+				SELECT COALESCE(SUM(CASE 
+					WHEN tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
+				END), 0)
+				FROM tournament_rounds tr2
+				LEFT JOIN tournament_matches tm ON tr2.id = tm.tournament_round_id
+				WHERE tr2.tournament_id = ts.tournament_id AND tr2.format = 'PB' AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id)
+			) as pb_ties,
+			(
+				SELECT COALESCE(SUM(CASE 
+					WHEN tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
+				END), 0)
+				FROM tournament_rounds tr2
+				LEFT JOIN tournament_matches tm ON tr2.id = tm.tournament_round_id
+				WHERE tr2.tournament_id = ts.tournament_id AND tr2.format = 'PB' AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id)
+			) as pb_matches,
+			-- BF stats aggregated via subquery
+			(
+				SELECT COALESCE(SUM(CASE 
+					WHEN tm.completed = true AND (
+						(tm.player1_id = ts.player_id AND tm.score1 > tm.score2) OR
+						(tm.player2_id = ts.player_id AND tm.score2 > tm.score1)
+					) THEN 1 ELSE 0 
+				END), 0)
+				FROM tournament_rounds tr2
+				LEFT JOIN tournament_matches tm ON tr2.id = tm.tournament_round_id
+				WHERE tr2.tournament_id = ts.tournament_id AND tr2.format = 'BF' AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id)
+			) as bf_wins,
+			(
+				SELECT COALESCE(SUM(CASE 
+					WHEN tm.completed = true AND tm.score1 = tm.score2 AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
+				END), 0)
+				FROM tournament_rounds tr2
+				LEFT JOIN tournament_matches tm ON tr2.id = tm.tournament_round_id
+				WHERE tr2.tournament_id = ts.tournament_id AND tr2.format = 'BF' AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id)
+			) as bf_ties,
+			(
+				SELECT COALESCE(SUM(CASE 
+					WHEN tm.completed = true AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id) THEN 1 ELSE 0 
+				END), 0)
+				FROM tournament_rounds tr2
+				LEFT JOIN tournament_matches tm ON tr2.id = tm.tournament_round_id
+				WHERE tr2.tournament_id = ts.tournament_id AND tr2.format = 'BF' AND (tm.player1_id = ts.player_id OR tm.player2_id = ts.player_id)
+			) as bf_matches
 		FROM premier_players pp
 		LEFT JOIN tournament_standings ts ON ts.player_name = pp.name
-		LEFT JOIN tournament_rounds tr ON ts.tournament_id = tr.tournament_id
-		LEFT JOIN tournament_matches tm ON tr.id = tm.tournament_round_id
 		GROUP BY pp.id, pp.name
 		ORDER BY first_place_count DESC, second_place_count DESC, third_place_count DESC
 	`
