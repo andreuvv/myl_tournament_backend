@@ -1233,15 +1233,15 @@ func GetGlobalStandings(c *gin.Context) {
 	defer rows.Close()
 
 	type GlobalStanding struct {
-		PlayerID           int     `json:"player_id"`
-		PlayerName         string  `json:"player_name"`
-		FirstPlaceCount    int     `json:"first_place_count"`
-		SecondPlaceCount   int     `json:"second_place_count"`
-		ThirdPlaceCount    int     `json:"third_place_count"`
-		MostPlayedRacePB   *string `json:"most_played_race_pb"`
-		MostPlayedRaceBF   *string `json:"most_played_race_bf"`
-		WinratePB          float64 `json:"winrate_pb"`
-		WinateBF           float64 `json:"winrate_bf"`
+		PlayerID         int     `json:"player_id"`
+		PlayerName       string  `json:"player_name"`
+		FirstPlaceCount  int     `json:"first_place_count"`
+		SecondPlaceCount int     `json:"second_place_count"`
+		ThirdPlaceCount  int     `json:"third_place_count"`
+		MostPlayedRacePB *string `json:"most_played_race_pb"`
+		MostPlayedRaceBF *string `json:"most_played_race_bf"`
+		WinratePB        float64 `json:"winrate_pb"`
+		WinateBF         float64 `json:"winrate_bf"`
 	}
 
 	standings := []GlobalStanding{}
