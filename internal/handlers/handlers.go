@@ -1172,49 +1172,14 @@ func GetPremierPlayers(c *gin.Context) {
 
 // GetGlobalStandings returns aggregated standings from all archived tournaments
 func GetGlobalStandings(c *gin.Context) {
+	// Get all players with their medal counts
 	query := `
 		SELECT 
 			pp.id,
 			pp.name,
 			COALESCE(SUM(CASE WHEN ts.final_position = 1 THEN 1 ELSE 0 END), 0) as first_place_count,
 			COALESCE(SUM(CASE WHEN ts.final_position = 2 THEN 1 ELSE 0 END), 0) as second_place_count,
-			COALESCE(SUM(CASE WHEN ts.final_position = 3 THEN 1 ELSE 0 END), 0) as third_place_count,
-			(
-				SELECT race_pb
-				FROM tournament_player_races tpr
-				WHERE tpr.player_name = pp.name AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
-				GROUP BY race_pb
-				ORDER BY COUNT(*) DESC
-				LIMIT 1
-			) as most_played_race_pb,
-			(
-				SELECT race_bf
-				FROM tournament_player_races tpr
-				WHERE tpr.player_name = pp.name AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
-				GROUP BY race_bf
-				ORDER BY COUNT(*) DESC
-				LIMIT 1
-			) as most_played_race_bf,
-			COALESCE((
-				SELECT ROUND(SUM(CASE 
-					WHEN m.player1_id = pp.id AND m.score1 > m.score2 THEN 1
-					WHEN m.player2_id = pp.id AND m.score2 > m.score1 THEN 1
-					WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = pp.id OR m.player2_id = pp.id) THEN 0.5
-					ELSE 0 
-				END) * 100.0 / NULLIF(COUNT(DISTINCT m.id), 0), 1) 
-				FROM tournament_rounds tr
-				JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = pp.id OR m.player2_id = pp.id)
-			), 0) as winrate_pb,
-			COALESCE((
-				SELECT ROUND(SUM(CASE 
-					WHEN m.player1_id = pp.id AND m.score1 > m.score2 THEN 1
-					WHEN m.player2_id = pp.id AND m.score2 > m.score1 THEN 1
-					WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = pp.id OR m.player2_id = pp.id) THEN 0.5
-					ELSE 0 
-				END) * 100.0 / NULLIF(COUNT(DISTINCT m.id), 0), 1)
-				FROM tournament_rounds tr
-				JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = pp.id OR m.player2_id = pp.id)
-			), 0) as winrate_bf
+			COALESCE(SUM(CASE WHEN ts.final_position = 3 THEN 1 ELSE 0 END), 0) as third_place_count
 		FROM premier_players pp
 		LEFT JOIN tournament_standings ts ON ts.player_name = pp.name
 		GROUP BY pp.id, pp.name
@@ -1249,14 +1214,65 @@ func GetGlobalStandings(c *gin.Context) {
 			&s.FirstPlaceCount,
 			&s.SecondPlaceCount,
 			&s.ThirdPlaceCount,
-			&s.MostPlayedRacePB,
-			&s.MostPlayedRaceBF,
-			&s.WinratePB,
-			&s.WinateBF,
 		)
 		if err != nil {
 			continue
 		}
+
+		// Get most played race and winrate for PB
+		pbRaceQuery := `
+			SELECT tpr.race_pb, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = $1 AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = $1 AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = $1 OR m.player2_id = $1) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = $1 OR m.player2_id = $1)
+			WHERE tpr.player_name = $2 AND tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
+			GROUP BY tpr.race_pb
+			ORDER BY COUNT(*) DESC
+			LIMIT 1
+		`
+
+		var pbRace *string
+		var pbTotalMatches int
+		var pbWinPoints float64
+		pbErr := database.DB.QueryRow(pbRaceQuery, s.PlayerID, s.PlayerName).Scan(&pbRace, &pbTotalMatches, &pbWinPoints)
+		if pbErr == nil && pbTotalMatches > 0 {
+			s.MostPlayedRacePB = pbRace
+			s.WinratePB = (pbWinPoints * 100.0) / float64(pbTotalMatches)
+		}
+
+		// Get most played race and winrate for BF
+		bfRaceQuery := `
+			SELECT tpr.race_bf, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = $1 AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = $1 AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = $1 OR m.player2_id = $1) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = $1 OR m.player2_id = $1)
+			WHERE tpr.player_name = $2 AND tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
+			GROUP BY tpr.race_bf
+			ORDER BY COUNT(*) DESC
+			LIMIT 1
+		`
+
+		var bfRace *string
+		var bfTotalMatches int
+		var bfWinPoints float64
+		bfErr := database.DB.QueryRow(bfRaceQuery, s.PlayerID, s.PlayerName).Scan(&bfRace, &bfTotalMatches, &bfWinPoints)
+		if bfErr == nil && bfTotalMatches > 0 {
+			s.MostPlayedRaceBF = bfRace
+			s.WinateBF = (bfWinPoints * 100.0) / float64(bfTotalMatches)
+		}
+
 		standings = append(standings, s)
 	}
 
