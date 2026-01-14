@@ -1046,17 +1046,17 @@ func UpdatePlayerRace(c *gin.Context) {
 		// Update existing record
 		query = `
 			UPDATE tournament_player_races 
-			SET race_pb = $1, race_bf = $2, notes = $3, updated_at = CURRENT_TIMESTAMP
-			WHERE tournament_id = $4 AND player_id = $5
+			SET player_name = $1, race_pb = $2, race_bf = $3, notes = $4, updated_at = CURRENT_TIMESTAMP
+			WHERE tournament_id = $5 AND player_id = $6
 		`
-		args = []interface{}{req.RacePB, req.RaceBF, req.Notes, tournamentID, playerID}
+		args = []interface{}{req.PlayerName, req.RacePB, req.RaceBF, req.Notes, tournamentID, playerID}
 	} else {
 		// Insert new record
 		query = `
-			INSERT INTO tournament_player_races (tournament_id, player_id, race_pb, race_bf, notes)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO tournament_player_races (tournament_id, player_id, player_name, race_pb, race_bf, notes)
+			VALUES ($1, $2, $3, $4, $5, $6)
 		`
-		args = []interface{}{tournamentID, playerID, req.RacePB, req.RaceBF, req.Notes}
+		args = []interface{}{tournamentID, playerID, req.PlayerName, req.RacePB, req.RaceBF, req.Notes}
 	}
 
 	_, err = database.DB.Exec(query, args...)

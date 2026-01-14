@@ -189,7 +189,8 @@ type TournamentPlayerRace struct {
 }
 
 type UpdatePlayerRaceRequest struct {
-	RacePB *string `json:"race_pb"`
-	RaceBF *string `json:"race_bf"`
-	Notes  *string `json:"notes"`
+	PlayerName *string `json:"player_name"`
+	RacePB     *string `json:"race_pb"`
+	RaceBF     *string `json:"race_bf"`
+	Notes      *string `json:"notes"`
 }
