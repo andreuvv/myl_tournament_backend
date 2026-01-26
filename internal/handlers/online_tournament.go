@@ -439,12 +439,13 @@ func GetOnlineTournamentInfo(c *gin.Context) {
 
 	var tournament models.Tournament
 	var format sql.NullString
+	var tournamentType string
 	err := database.DB.QueryRow(query, tournamentID).Scan(
 		&tournament.ID,
 		&tournament.Name,
 		&tournament.Month,
 		&tournament.Year,
-		nil, // type
+		&tournamentType,
 		&format,
 		&tournament.StartDate,
 		&tournament.EndDate,
@@ -467,7 +468,7 @@ func GetOnlineTournamentInfo(c *gin.Context) {
 		"month":      tournament.Month,
 		"year":       tournament.Year,
 		"format":     format.String,
-		"type":       "ONLINE",
+		"type":       tournamentType,
 		"start_date": tournament.StartDate,
 		"end_date":   tournament.EndDate,
 		"created_at": tournament.CreatedAt,
