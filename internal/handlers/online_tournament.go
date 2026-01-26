@@ -44,13 +44,13 @@ func CreateOnlineTournament(c *gin.Context) {
 		return
 	}
 
-	// Get player names from IDs
+	// Get player names from IDs (from premier_players table)
 	playerMap := make(map[int]string)
 	for _, playerID := range req.PlayerIDs {
 		var name string
-		err := tx.QueryRow("SELECT name FROM players WHERE id = $1", playerID).Scan(&name)
+		err := tx.QueryRow("SELECT name FROM premier_players WHERE id = $1", playerID).Scan(&name)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Player with ID %d not found", playerID)})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Player with ID %d not found in premier players", playerID)})
 			return
 		}
 		playerMap[playerID] = name
