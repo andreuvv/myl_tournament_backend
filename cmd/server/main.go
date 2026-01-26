@@ -56,6 +56,9 @@ func main() {
 		public.GET("/tournaments/:id/races", handlers.GetTournamentRaces)
 		public.GET("/tournaments/:id/players", handlers.GetArchivedTournamentPlayers)
 		public.GET("/tournaments/:id/player-races", handlers.GetTournamentPlayerRaces)
+
+		// Active tournaments (online and in-person)
+		public.GET("/tournaments/active", handlers.GetAllActiveTournaments)
 	}
 
 	// Protected routes (require API key)
@@ -82,6 +85,16 @@ func main() {
 
 		// Tournament player race tracking
 		protected.PATCH("/tournaments/:id/players/:player_id/race", handlers.UpdatePlayerRace)
+
+		// Online tournament routes
+		protected.POST("/tournaments/online", handlers.CreateOnlineTournament)
+		protected.GET("/tournaments/online/:id/info", handlers.GetOnlineTournamentInfo)
+		protected.GET("/tournaments/online/:id/matches", handlers.GetOnlineTournamentMatches)
+		protected.GET("/tournaments/online/:id/matches/pending", handlers.GetOnlinePendingMatches)
+		protected.GET("/tournaments/online/:id/matches/completed", handlers.GetOnlineCompletedMatches)
+		protected.GET("/tournaments/online/:id/standings", handlers.GetOnlineTournamentStandings)
+		protected.PATCH("/tournaments/online/matches/:matchId", handlers.UpdateOnlineMatchScore)
+		protected.DELETE("/tournaments/online/:id", handlers.DeleteOnlineTournament)
 	}
 
 	// Health check

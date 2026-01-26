@@ -194,3 +194,45 @@ type UpdatePlayerRaceRequest struct {
 	RaceBF     *string `json:"race_bf"`
 	Notes      *string `json:"notes"`
 }
+
+// Online tournament models
+type CreateOnlineTournamentRequest struct {
+	Name      string  `json:"name" binding:"required"`
+	Month     string  `json:"month" binding:"required"`
+	Year      int     `json:"year" binding:"required"`
+	Format    string  `json:"format" binding:"required,oneof=PB BF"`
+	PlayerIDs []int   `json:"player_ids" binding:"required"`
+	StartDate *string `json:"start_date"`
+	EndDate   *string `json:"end_date"`
+}
+
+type OnlineTournamentMatch struct {
+	ID           int        `json:"id"`
+	TournamentID int        `json:"tournament_id"`
+	Player1ID    int        `json:"player1_id"`
+	Player2ID    int        `json:"player2_id"`
+	Player1Name  string     `json:"player1_name"`
+	Player2Name  string     `json:"player2_name"`
+	Score1       *int       `json:"score1"`
+	Score2       *int       `json:"score2"`
+	Completed    bool       `json:"completed"`
+	MatchDate    *time.Time `json:"match_date"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type OnlineTournamentStanding struct {
+	TournamentID  int    `json:"tournament_id"`
+	PlayerID      int    `json:"player_id"`
+	PlayerName    string `json:"player_name"`
+	MatchesPlayed int    `json:"matches_played"`
+	Wins          int    `json:"wins"`
+	Ties          int    `json:"ties"`
+	Losses        int    `json:"losses"`
+	Points        int    `json:"points"`
+}
+
+type UpdateOnlineMatchScoreRequest struct {
+	Score1 int `json:"score1" binding:"gte=0"`
+	Score2 int `json:"score2" binding:"gte=0"`
+}
