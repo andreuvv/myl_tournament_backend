@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS online_tournament_players (
     id SERIAL PRIMARY KEY,
     tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-    player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    player_id INTEGER NOT NULL REFERENCES premier_players(id) ON DELETE CASCADE,
     player_name VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(tournament_id, player_id)
@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS online_tournament_players (
 CREATE TABLE IF NOT EXISTS online_tournament_matches (
     id SERIAL PRIMARY KEY,
     tournament_id INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-    player1_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    player2_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    player1_id INTEGER NOT NULL REFERENCES premier_players(id) ON DELETE CASCADE,
+    player2_id INTEGER NOT NULL REFERENCES premier_players(id) ON DELETE CASCADE,
     player1_name VARCHAR(100) NOT NULL,
     player2_name VARCHAR(100) NOT NULL,
     score1 INTEGER,
