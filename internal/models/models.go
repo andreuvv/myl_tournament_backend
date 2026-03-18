@@ -25,6 +25,7 @@ type Match struct {
 	Player2ID int       `json:"player2_id"`
 	Score1    *int      `json:"score1"`
 	Score2    *int      `json:"score2"`
+	Subformat *string   `json:"subformat"` // PBRL, PBRE, BFRL, BFVCR
 	Completed bool      `json:"completed"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -34,6 +35,7 @@ type MatchDetail struct {
 	ID          int       `json:"id"`
 	RoundNumber int       `json:"round_number"`
 	Format      string    `json:"format"`
+	Subformat   *string   `json:"subformat"`
 	Player1Name string    `json:"player1_name"`
 	Player2Name string    `json:"player2_name"`
 	Score1      *int      `json:"score1"`
@@ -77,9 +79,10 @@ type UpdateScoreRequest struct {
 }
 
 type FixtureRound struct {
-	Number  int           `json:"number"`
-	Format  string        `json:"format"`
-	Matches []MatchDetail `json:"matches"`
+	Number    int           `json:"number"`
+	Format    string        `json:"format"`
+	Subformat *string       `json:"subformat"`
+	Matches   []MatchDetail `json:"matches"`
 }
 
 type FixtureResponse struct {
@@ -92,8 +95,9 @@ type CreateFixtureRequest struct {
 		RoundNumber int    `json:"round_number" binding:"required"`
 		Format      string `json:"format" binding:"required,oneof=PB BF"`
 		Matches     []struct {
-			Player1Name string `json:"player1_name" binding:"required"`
-			Player2Name string `json:"player2_name" binding:"required"`
+			Player1Name string  `json:"player1_name" binding:"required"`
+			Player2Name string  `json:"player2_name" binding:"required"`
+			Subformat   *string `json:"subformat"`
 		} `json:"matches" binding:"required"`
 	} `json:"rounds" binding:"required"`
 }

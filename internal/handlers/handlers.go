@@ -17,6 +17,7 @@ func GetFixture(c *gin.Context) {
 			r.round_number,
 			r.format,
 			m.id as match_id,
+			m.subformat,
 			p1.name as player1_name,
 			p2.name as player2_name,
 			m.score1,
@@ -48,6 +49,7 @@ func GetFixture(c *gin.Context) {
 			&roundNum,
 			&format,
 			&match.ID,
+			&match.Subformat,
 			&match.Player1Name,
 			&match.Player2Name,
 			&match.Score1,
@@ -357,8 +359,8 @@ func CreateFixture(c *gin.Context) {
 			}
 
 			_, err := tx.Exec(
-				"INSERT INTO matches (round_id, player1_id, player2_id) VALUES ($1, $2, $3)",
-				roundID, player1ID, player2ID,
+				"INSERT INTO matches (round_id, player1_id, player2_id, subformat) VALUES ($1, $2, $3, $4)",
+				roundID, player1ID, player2ID, m.Subformat,
 			)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create match"})
