@@ -43,13 +43,14 @@ func GetFixture(c *gin.Context) {
 	for rows.Next() {
 		var roundNum int
 		var format string
+		var subformat *string
 		var match models.MatchDetail
 
 		err := rows.Scan(
 			&roundNum,
 			&format,
 			&match.ID,
-			&match.Subformat,
+			&subformat,
 			&match.Player1Name,
 			&match.Player2Name,
 			&match.Score1,
@@ -63,14 +64,16 @@ func GetFixture(c *gin.Context) {
 
 		if _, exists := roundsMap[roundNum]; !exists {
 			roundsMap[roundNum] = &models.FixtureRound{
-				Number:  roundNum,
-				Format:  format,
-				Matches: []models.MatchDetail{},
+				Number:    roundNum,
+				Format:    format,
+				Subformat: subformat,
+				Matches:   []models.MatchDetail{},
 			}
 		}
 
 		match.RoundNumber = roundNum
 		match.Format = format
+		match.Subformat = subformat
 		roundsMap[roundNum].Matches = append(roundsMap[roundNum].Matches, match)
 	}
 
