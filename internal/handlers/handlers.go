@@ -930,18 +930,16 @@ func GetTournamentRaces(c *gin.Context) {
 
 	// Get Libre race winrates
 	libreWinrateQuery := `
-		SELECT tpr.race_libre, COUNT(m.id) as total_matches, 
-		       COALESCE(SUM(CASE 
+		SELECT tpr.race_libre, COUNT(*) as total_matches, 
+		       SUM(CASE 
 		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
 		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
-		             WHEN m.score1 = m.score2 AND m.score1 IS NOT NULL AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
 		             ELSE 0 
-		           END), 0) as win_points
+		           END) as win_points
 		FROM tournament_player_races tpr
-		LEFT JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		LEFT JOIN tournament_matches m ON m.tournament_round_id = tr.id 
-			AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
-			AND COALESCE(m.subformat, '') LIKE '%Libre'
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND m.subformat LIKE '%Libre' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 		WHERE tpr.tournament_id = $1 AND tpr.race_libre IS NOT NULL AND tpr.race_libre != ''
 		GROUP BY tpr.race_libre
 	`
@@ -998,18 +996,16 @@ func GetTournamentRaces(c *gin.Context) {
 
 	// Get VCR race winrates
 	vcrWinrateQuery := `
-		SELECT tpr.race_edition_vcr, COUNT(m.id) as total_matches, 
-		       COALESCE(SUM(CASE 
+		SELECT tpr.race_edition_vcr, COUNT(*) as total_matches, 
+		       SUM(CASE 
 		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
 		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
-		             WHEN m.score1 = m.score2 AND m.score1 IS NOT NULL AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
 		             ELSE 0 
-		           END), 0) as win_points
+		           END) as win_points
 		FROM tournament_player_races tpr
-		LEFT JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		LEFT JOIN tournament_matches m ON m.tournament_round_id = tr.id 
-			AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
-			AND (COALESCE(m.subformat, '') LIKE '%Edition' OR COALESCE(m.subformat, '') LIKE '%VCR')
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.subformat LIKE '%Edition' OR m.subformat LIKE '%VCR') AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 		WHERE tpr.tournament_id = $1 AND tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != ''
 		GROUP BY tpr.race_edition_vcr
 	`
