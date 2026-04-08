@@ -1034,12 +1034,12 @@ func GetTournamentRaces(c *gin.Context) {
 	}
 
 	response := gin.H{
-		"pb_races":           pbRaces,
-		"bf_races":           bfRaces,
-		"libre_races":        libreRaces,
-		"vcr_races":          vcrRaces,
-		"pb_race_winrates":   pbRaceWinrates,
-		"bf_race_winrates":   bfRaceWinrates,
+		"pb_races":            pbRaces,
+		"bf_races":            bfRaces,
+		"libre_races":         libreRaces,
+		"vcr_races":           vcrRaces,
+		"pb_race_winrates":    pbRaceWinrates,
+		"bf_race_winrates":    bfRaceWinrates,
 		"libre_race_winrates": libreRaceWinrates,
 		"vcr_race_winrates":   vcrRaceWinrates,
 	}
