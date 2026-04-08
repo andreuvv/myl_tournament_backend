@@ -649,7 +649,7 @@ func GetTournamentStandings(c *gin.Context) {
 	query := `
 		SELECT 
 			ts.id, ts.tournament_id, ts.player_id, ts.player_name, ts.matches_played, ts.wins, ts.ties, ts.losses,
-			ts.points, ts.total_points_scored, ts.total_matches, ts.final_position, tpr.race_pb, tpr.race_bf
+			ts.points, ts.total_points_scored, ts.total_matches, ts.final_position, tpr.race_pb, tpr.race_bf, tpr.race_libre, tpr.race_edition_vcr
 		FROM tournament_standings ts
 		LEFT JOIN tournament_player_races tpr ON ts.tournament_id = tpr.tournament_id AND ts.player_id = tpr.player_id
 		WHERE ts.tournament_id = $1
@@ -669,7 +669,7 @@ func GetTournamentStandings(c *gin.Context) {
 		err := rows.Scan(
 			&s.ID, &s.TournamentID, &s.PlayerID, &s.PlayerName, &s.MatchesPlayed,
 			&s.Wins, &s.Ties, &s.Losses, &s.Points, &s.TotalPointsScored,
-			&s.TotalMatches, &s.FinalPosition, &s.RacePB, &s.RaceBF,
+			&s.TotalMatches, &s.FinalPosition, &s.RacePB, &s.RaceBF, &s.RaceLibre, &s.RaceEditionVCR,
 		)
 		if err != nil {
 			continue
@@ -694,7 +694,7 @@ func GetTournamentRounds(c *gin.Context) {
 
 	// Get rounds
 	roundsQuery := `
-		SELECT id, round_number, format
+		SELECT id, round_number, format, subformat
 		FROM tournament_rounds
 		WHERE tournament_id = $1
 		ORDER BY round_number
@@ -712,15 +712,17 @@ func GetTournamentRounds(c *gin.Context) {
 	for rows.Next() {
 		var roundID, roundNumber int
 		var format string
-		err := rows.Scan(&roundID, &roundNumber, &format)
+		var subformat *string
+		err := rows.Scan(&roundID, &roundNumber, &format, &subformat)
 		if err != nil {
 			continue
 		}
 
 		roundsMap[roundNumber] = &models.TournamentRoundDetail{
-			Number:  roundNumber,
-			Format:  format,
-			Matches: []models.TournamentMatchInfo{},
+			Number:    roundNumber,
+			Format:    format,
+			Subformat: subformat,
+			Matches:   []models.TournamentMatchInfo{},
 		}
 
 		// Get matches for this round
@@ -899,9 +901,65 @@ func GetTournamentRaces(c *gin.Context) {
 		}
 	}
 
+	// Get Libre race counts
+	libreQuery := `
+		SELECT race_libre, COUNT(*) as count
+		FROM tournament_player_races
+		WHERE tournament_id = $1 AND race_libre IS NOT NULL AND race_libre != ''
+		GROUP BY race_libre
+		ORDER BY count DESC
+	`
+
+	libreRows, err := database.DB.Query(libreQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch Libre races"})
+		return
+	}
+	defer libreRows.Close()
+
+	libreRaces := make(map[string]int)
+	for libreRows.Next() {
+		var race string
+		var count int
+		err := libreRows.Scan(&race, &count)
+		if err != nil {
+			continue
+		}
+		libreRaces[race] = count
+	}
+
+	// Get Edition VCR race counts
+	vcrQuery := `
+		SELECT race_edition_vcr, COUNT(*) as count
+		FROM tournament_player_races
+		WHERE tournament_id = $1 AND race_edition_vcr IS NOT NULL AND race_edition_vcr != ''
+		GROUP BY race_edition_vcr
+		ORDER BY count DESC
+	`
+
+	vcrRows, err := database.DB.Query(vcrQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch Edition VCR races"})
+		return
+	}
+	defer vcrRows.Close()
+
+	vcrRaces := make(map[string]int)
+	for vcrRows.Next() {
+		var race string
+		var count int
+		err := vcrRows.Scan(&race, &count)
+		if err != nil {
+			continue
+		}
+		vcrRaces[race] = count
+	}
+
 	response := gin.H{
 		"pb_races":         pbRaces,
 		"bf_races":         bfRaces,
+		"libre_races":      libreRaces,
+		"vcr_races":        vcrRaces,
 		"pb_race_winrates": pbRaceWinrates,
 		"bf_race_winrates": bfRaceWinrates,
 	}
@@ -966,6 +1024,8 @@ func GetTournamentPlayerRaces(c *gin.Context) {
 			p.name as player_name,
 			tpr.race_pb,
 			tpr.race_bf,
+			tpr.race_libre,
+			tpr.race_edition_vcr,
 			tpr.notes,
 			tpr.created_at,
 			tpr.updated_at
@@ -994,6 +1054,8 @@ func GetTournamentPlayerRaces(c *gin.Context) {
 			&pr.PlayerName,
 			&pr.RacePB,
 			&pr.RaceBF,
+			&pr.RaceLibre,
+			&pr.RaceEditionVCR,
 			&pr.Notes,
 			&pr.CreatedAt,
 			&pr.UpdatedAt,
@@ -1051,18 +1113,18 @@ func UpdatePlayerRace(c *gin.Context) {
 	if exists {
 		// Update existing record
 		query = `
-			UPDATE tournament_player_races 
-			SET player_name = $1, race_pb = $2, race_bf = $3, notes = $4, updated_at = CURRENT_TIMESTAMP
-			WHERE tournament_id = $5 AND player_id = $6
+			UPDATE tournament_player_races
+			SET player_name = $1, race_pb = $2, race_bf = $3, race_libre = $4, race_edition_vcr = $5, notes = $6, updated_at = CURRENT_TIMESTAMP
+			WHERE tournament_id = $7 AND player_id = $8
 		`
-		args = []interface{}{req.PlayerName, req.RacePB, req.RaceBF, req.Notes, tournamentID, playerID}
+		args = []interface{}{req.PlayerName, req.RacePB, req.RaceBF, req.RaceLibre, req.RaceEditionVCR, req.Notes, tournamentID, playerID}
 	} else {
 		// Insert new record
 		query = `
-			INSERT INTO tournament_player_races (tournament_id, player_id, player_name, race_pb, race_bf, notes)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO tournament_player_races (tournament_id, player_id, player_name, race_pb, race_bf, race_libre, race_edition_vcr, notes)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`
-		args = []interface{}{tournamentID, playerID, req.PlayerName, req.RacePB, req.RaceBF, req.Notes}
+		args = []interface{}{tournamentID, playerID, req.PlayerName, req.RacePB, req.RaceBF, req.RaceLibre, req.RaceEditionVCR, req.Notes}
 	}
 
 	_, err = database.DB.Exec(query, args...)

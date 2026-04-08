@@ -25,6 +25,8 @@ type PlayerTournamentHistory struct {
 	TotalPointsScored int     `json:"total_points_scored"`
 	RacePB            *string `json:"race_pb"`
 	RaceBF            *string `json:"race_bf"`
+	RaceLibre         *string `json:"race_libre"`
+	RaceEditionVCR    *string `json:"race_edition_vcr"`
 	// Win data by format from actual match results
 	PBWins    int `json:"pb_wins"`
 	PBTies    int `json:"pb_ties"`
@@ -93,6 +95,8 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 			ts.total_points_scored,
 			tpr.race_pb,
 			tpr.race_bf,
+			tpr.race_libre,
+			tpr.race_edition_vcr,
 			-- PB format statistics
 			COALESCE(SUM(CASE 
 				WHEN tr.format = 'PB' AND tm.completed = true AND (
@@ -124,7 +128,7 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 		LEFT JOIN tournament_player_races tpr ON t.id = tpr.tournament_id AND tpr.player_name = ts.player_name
 		LEFT JOIN tournament_rounds tr ON t.id = tr.tournament_id
 		LEFT JOIN tournament_matches tm ON tr.id = tm.tournament_round_id
-		GROUP BY t.id, t.name, t.month, t.year, ts.id, tpr.race_pb, tpr.race_bf
+		GROUP BY t.id, t.name, t.month, t.year, ts.id, tpr.race_pb, tpr.race_bf, tpr.race_libre, tpr.race_edition_vcr
 		ORDER BY t.year DESC, t.month DESC
 	`
 
@@ -142,6 +146,8 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 		var h PlayerTournamentHistory
 		var racePB sql.NullString
 		var raceBF sql.NullString
+		var raceLibre sql.NullString
+		var raceEditionVCR sql.NullString
 
 		err := rows.Scan(
 			&h.TournamentID,
@@ -157,6 +163,8 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 			&h.TotalPointsScored,
 			&racePB,
 			&raceBF,
+			&raceLibre,
+			&raceEditionVCR,
 			&h.PBWins,
 			&h.PBTies,
 			&h.PBMatches,
@@ -174,6 +182,12 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 		}
 		if raceBF.Valid {
 			h.RaceBF = &raceBF.String
+		}
+		if raceLibre.Valid {
+			h.RaceLibre = &raceLibre.String
+		}
+		if raceEditionVCR.Valid {
+			h.RaceEditionVCR = &raceEditionVCR.String
 		}
 
 		history = append(history, h)

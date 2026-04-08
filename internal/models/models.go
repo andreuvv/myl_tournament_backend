@@ -130,6 +130,8 @@ type TournamentStanding struct {
 	FinalPosition     int     `json:"final_position"`
 	RacePB            *string `json:"race_pb"`
 	RaceBF            *string `json:"race_bf"`
+	RaceLibre         *string `json:"race_libre"`
+	RaceEditionVCR    *string `json:"race_edition_vcr"`
 }
 
 type TournamentRound struct {
@@ -137,6 +139,7 @@ type TournamentRound struct {
 	TournamentID int       `json:"tournament_id"`
 	RoundNumber  int       `json:"round_number"`
 	Format       string    `json:"format"`
+	Subformat    *string   `json:"subformat"` // PBRL, PBRE, BFRL, BFVCR
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -162,9 +165,10 @@ type ArchiveTournamentRequest struct {
 }
 
 type TournamentRoundDetail struct {
-	Number  int                   `json:"number"`
-	Format  string                `json:"format"`
-	Matches []TournamentMatchInfo `json:"matches"`
+	Number    int                   `json:"number"`
+	Format    string                `json:"format"`
+	Subformat *string               `json:"subformat"` // PBRL, PBRE, BFRL, BFVCR
+	Matches   []TournamentMatchInfo `json:"matches"`
 }
 
 type TournamentMatchInfo struct {
@@ -182,22 +186,26 @@ type TournamentRoundsResponse struct {
 }
 
 type TournamentPlayerRace struct {
-	ID           int       `json:"id"`
-	TournamentID int       `json:"tournament_id"`
-	PlayerID     int       `json:"player_id"`
-	PlayerName   string    `json:"player_name"`
-	RacePB       *string   `json:"race_pb"`
-	RaceBF       *string   `json:"race_bf"`
-	Notes        *string   `json:"notes"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID             int       `json:"id"`
+	TournamentID   int       `json:"tournament_id"`
+	PlayerID       int       `json:"player_id"`
+	PlayerName     string    `json:"player_name"`
+	RacePB         *string   `json:"race_pb"`
+	RaceBF         *string   `json:"race_bf"`
+	RaceLibre      *string   `json:"race_libre"`
+	RaceEditionVCR *string   `json:"race_edition_vcr"`
+	Notes          *string   `json:"notes"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type UpdatePlayerRaceRequest struct {
-	PlayerName *string `json:"player_name"`
-	RacePB     *string `json:"race_pb"`
-	RaceBF     *string `json:"race_bf"`
-	Notes      *string `json:"notes"`
+	PlayerName     *string `json:"player_name"`
+	RacePB         *string `json:"race_pb"`
+	RaceBF         *string `json:"race_bf"`
+	RaceLibre      *string `json:"race_libre"`
+	RaceEditionVCR *string `json:"race_edition_vcr"`
+	Notes          *string `json:"notes"`
 }
 
 // Online tournament models
