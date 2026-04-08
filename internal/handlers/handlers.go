@@ -939,7 +939,7 @@ func GetTournamentRaces(c *gin.Context) {
 		           END) as win_points
 		FROM tournament_player_races tpr
 		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND m.subformat LIKE '%Libre' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND m.subformat IS NOT NULL AND m.subformat LIKE '%Libre' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 		WHERE tpr.tournament_id = $1 AND tpr.race_libre IS NOT NULL AND tpr.race_libre != ''
 		GROUP BY tpr.race_libre
 	`
@@ -1005,7 +1005,7 @@ func GetTournamentRaces(c *gin.Context) {
 		           END) as win_points
 		FROM tournament_player_races tpr
 		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.subformat LIKE '%Edition' OR m.subformat LIKE '%VCR') AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND m.subformat IS NOT NULL AND (m.subformat LIKE '%Edition' OR m.subformat LIKE '%VCR') AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 		WHERE tpr.tournament_id = $1 AND tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != ''
 		GROUP BY tpr.race_edition_vcr
 	`
