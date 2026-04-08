@@ -938,9 +938,9 @@ func GetTournamentRaces(c *gin.Context) {
 		             ELSE 0 
 		           END) as win_points
 		FROM tournament_player_races tpr
-		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id AND COALESCE(tr.subformat, '') LIKE '%Libre'
 		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
-		WHERE tpr.tournament_id = $1 AND tpr.race_libre IS NOT NULL AND tpr.race_libre != '' AND COALESCE(m.subformat, '') LIKE '%Libre'
+		WHERE tpr.tournament_id = $1 AND tpr.race_libre IS NOT NULL AND tpr.race_libre != ''
 		GROUP BY tpr.race_libre
 	`
 
@@ -1004,9 +1004,9 @@ func GetTournamentRaces(c *gin.Context) {
 		             ELSE 0 
 		           END) as win_points
 		FROM tournament_player_races tpr
-		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id AND (COALESCE(tr.subformat, '') LIKE '%Edition' OR COALESCE(tr.subformat, '') LIKE '%VCR')
 		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
-		WHERE tpr.tournament_id = $1 AND tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != '' AND (COALESCE(m.subformat, '') LIKE '%Edition' OR COALESCE(m.subformat, '') LIKE '%VCR')
+		WHERE tpr.tournament_id = $1 AND tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != ''
 		GROUP BY tpr.race_edition_vcr
 	`
 
