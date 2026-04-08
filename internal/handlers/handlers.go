@@ -928,6 +928,45 @@ func GetTournamentRaces(c *gin.Context) {
 		libreRaces[race] = count
 	}
 
+	// Get Libre race winrates
+	libreWinrateQuery := `
+		SELECT tpr.race_libre, COUNT(*) as total_matches, 
+		       SUM(CASE 
+		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+		             ELSE 0 
+		           END) as win_points
+		FROM tournament_player_races tpr
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND m.subformat LIKE '%Libre' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+		WHERE tpr.tournament_id = $1 AND tpr.race_libre IS NOT NULL AND tpr.race_libre != ''
+		GROUP BY tpr.race_libre
+	`
+
+	libreWinrateRows, err := database.DB.Query(libreWinrateQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch Libre race winrates"})
+		return
+	}
+	defer libreWinrateRows.Close()
+
+	libreRaceWinrates := make(map[string]float64)
+	for libreWinrateRows.Next() {
+		var race string
+		var totalMatches int
+		var winPoints float64
+		err := libreWinrateRows.Scan(&race, &totalMatches, &winPoints)
+		if err != nil {
+			continue
+		}
+		if totalMatches > 0 {
+			libreRaceWinrates[race] = (winPoints * 100.0) / float64(totalMatches)
+		} else {
+			libreRaceWinrates[race] = 0.0
+		}
+	}
+
 	// Get Edition VCR race counts
 	vcrQuery := `
 		SELECT race_edition_vcr, COUNT(*) as count
@@ -955,13 +994,54 @@ func GetTournamentRaces(c *gin.Context) {
 		vcrRaces[race] = count
 	}
 
+	// Get VCR race winrates
+	vcrWinrateQuery := `
+		SELECT tpr.race_edition_vcr, COUNT(*) as total_matches, 
+		       SUM(CASE 
+		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+		             ELSE 0 
+		           END) as win_points
+		FROM tournament_player_races tpr
+		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.subformat LIKE '%Edition' OR m.subformat LIKE '%VCR') AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+		WHERE tpr.tournament_id = $1 AND tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != ''
+		GROUP BY tpr.race_edition_vcr
+	`
+
+	vcrWinrateRows, err := database.DB.Query(vcrWinrateQuery, tournamentID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch VCR race winrates"})
+		return
+	}
+	defer vcrWinrateRows.Close()
+
+	vcrRaceWinrates := make(map[string]float64)
+	for vcrWinrateRows.Next() {
+		var race string
+		var totalMatches int
+		var winPoints float64
+		err := vcrWinrateRows.Scan(&race, &totalMatches, &winPoints)
+		if err != nil {
+			continue
+		}
+		if totalMatches > 0 {
+			vcrRaceWinrates[race] = (winPoints * 100.0) / float64(totalMatches)
+		} else {
+			vcrRaceWinrates[race] = 0.0
+		}
+	}
+
 	response := gin.H{
-		"pb_races":         pbRaces,
-		"bf_races":         bfRaces,
-		"libre_races":      libreRaces,
-		"vcr_races":        vcrRaces,
-		"pb_race_winrates": pbRaceWinrates,
-		"bf_race_winrates": bfRaceWinrates,
+		"pb_races":           pbRaces,
+		"bf_races":           bfRaces,
+		"libre_races":        libreRaces,
+		"vcr_races":          vcrRaces,
+		"pb_race_winrates":   pbRaceWinrates,
+		"bf_race_winrates":   bfRaceWinrates,
+		"libre_race_winrates": libreRaceWinrates,
+		"vcr_race_winrates":   vcrRaceWinrates,
 	}
 
 	c.JSON(http.StatusOK, response)
