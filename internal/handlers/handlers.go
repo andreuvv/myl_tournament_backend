@@ -610,7 +610,7 @@ func ArchiveTournament(c *gin.Context) {
 // GetTournaments returns all archived tournaments
 func GetTournaments(c *gin.Context) {
 	query := `
-		SELECT id, name, month, year, type, format, start_date, end_date, created_at, archived_at
+		SELECT id, name, month, year, type, format, subformat, start_date, end_date, created_at, archived_at
 		FROM tournaments
 		WHERE type = 'IN_PERSON'
 		ORDER BY year DESC, 
@@ -632,7 +632,7 @@ func GetTournaments(c *gin.Context) {
 	tournaments := make([]models.Tournament, 0)
 	for rows.Next() {
 		var t models.Tournament
-		err := rows.Scan(&t.ID, &t.Name, &t.Month, &t.Year, &t.Type, &t.Format, &t.StartDate, &t.EndDate, &t.CreatedAt, &t.ArchivedAt)
+		err := rows.Scan(&t.ID, &t.Name, &t.Month, &t.Year, &t.Type, &t.Format, &t.Subformat, &t.StartDate, &t.EndDate, &t.CreatedAt, &t.ArchivedAt)
 		if err != nil {
 			continue
 		}

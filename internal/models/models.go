@@ -110,6 +110,7 @@ type Tournament struct {
 	Year       int       `json:"year"`
 	Type       string    `json:"type"`
 	Format     *string   `json:"format"`
+	Subformat  *string   `json:"subformat"`
 	StartDate  *string   `json:"start_date"`
 	EndDate    *string   `json:"end_date"`
 	CreatedAt  time.Time `json:"created_at"`
