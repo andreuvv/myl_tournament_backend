@@ -16,6 +16,8 @@ type PlayerTournamentHistory struct {
 	TournamentName    string  `json:"tournament_name"`
 	Month             string  `json:"month"`
 	Year              int     `json:"year"`
+	Format            *string `json:"format"`
+	Subformat         *string `json:"subformat"`
 	FinalPosition     int     `json:"final_position"`
 	MatchesPlayed     int     `json:"matches_played"`
 	Wins              int     `json:"wins"`
@@ -86,6 +88,8 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 			t.name,
 			t.month,
 			t.year,
+			t.format,
+			t.subformat,
 			ts.final_position,
 			ts.matches_played,
 			ts.wins,
@@ -128,7 +132,7 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 		LEFT JOIN tournament_player_races tpr ON t.id = tpr.tournament_id AND tpr.player_name = ts.player_name
 		LEFT JOIN tournament_rounds tr ON t.id = tr.tournament_id
 		LEFT JOIN tournament_matches tm ON tr.id = tm.tournament_round_id
-		GROUP BY t.id, t.name, t.month, t.year, ts.id, tpr.race_pb, tpr.race_bf, tpr.race_libre, tpr.race_edition_vcr
+		GROUP BY t.id, t.name, t.month, t.year, t.format, t.subformat, ts.id, tpr.race_pb, tpr.race_bf, tpr.race_libre, tpr.race_edition_vcr
 		ORDER BY t.year DESC, t.month DESC
 	`
 
@@ -148,12 +152,16 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 		var raceBF sql.NullString
 		var raceLibre sql.NullString
 		var raceEditionVCR sql.NullString
+		var format sql.NullString
+		var subformat sql.NullString
 
 		err := rows.Scan(
 			&h.TournamentID,
 			&h.TournamentName,
 			&h.Month,
 			&h.Year,
+			&format,
+			&subformat,
 			&h.FinalPosition,
 			&h.MatchesPlayed,
 			&h.Wins,
@@ -188,6 +196,12 @@ func fetchPlayerTournamentHistory(c *gin.Context, playerName string) {
 		}
 		if raceEditionVCR.Valid {
 			h.RaceEditionVCR = &raceEditionVCR.String
+		}
+		if format.Valid {
+			h.Format = &format.String
+		}
+		if subformat.Valid {
+			h.Subformat = &subformat.String
 		}
 
 		history = append(history, h)
