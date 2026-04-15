@@ -1328,21 +1328,47 @@ func GetGlobalStandings(c *gin.Context) {
 			COALESCE(SUM(CASE WHEN ts.final_position = 1 THEN 1 ELSE 0 END), 0) as first_place_count,
 			COALESCE(SUM(CASE WHEN ts.final_position = 2 THEN 1 ELSE 0 END), 0) as second_place_count,
 			COALESCE(SUM(CASE WHEN ts.final_position = 3 THEN 1 ELSE 0 END), 0) as third_place_count,
-			-- Most played race PB
+			-- Most played race PB (includes race_pb from mixed tournaments + race_libre/race_edition_vcr from PB-only tournaments)
 			(
-				SELECT race_pb
-				FROM tournament_player_races tpr2
-				WHERE tpr2.player_name = pp.name AND tpr2.race_pb IS NOT NULL AND tpr2.race_pb != ''
-				GROUP BY race_pb
+				SELECT race FROM (
+					SELECT race_pb as race
+					FROM tournament_player_races tpr2
+					JOIN tournaments t2 ON t2.id = tpr2.tournament_id
+					WHERE tpr2.player_name = pp.name AND tpr2.race_pb IS NOT NULL AND tpr2.race_pb != '' AND t2.format IS NULL
+					UNION ALL
+					SELECT race_libre as race
+					FROM tournament_player_races tpr2
+					JOIN tournaments t2 ON t2.id = tpr2.tournament_id
+					WHERE tpr2.player_name = pp.name AND tpr2.race_libre IS NOT NULL AND tpr2.race_libre != '' AND t2.format = 'PB'
+					UNION ALL
+					SELECT race_edition_vcr as race
+					FROM tournament_player_races tpr2
+					JOIN tournaments t2 ON t2.id = tpr2.tournament_id
+					WHERE tpr2.player_name = pp.name AND tpr2.race_edition_vcr IS NOT NULL AND tpr2.race_edition_vcr != '' AND t2.format = 'PB'
+				) pb_all
+				GROUP BY race
 				ORDER BY COUNT(*) DESC
 				LIMIT 1
 			) as most_played_race_pb,
-			-- Most played race BF
+			-- Most played race BF (includes race_bf from mixed tournaments + race_libre/race_edition_vcr from BF-only tournaments)
 			(
-				SELECT race_bf
-				FROM tournament_player_races tpr3
-				WHERE tpr3.player_name = pp.name AND tpr3.race_bf IS NOT NULL AND tpr3.race_bf != ''
-				GROUP BY race_bf
+				SELECT race FROM (
+					SELECT race_bf as race
+					FROM tournament_player_races tpr3
+					JOIN tournaments t3 ON t3.id = tpr3.tournament_id
+					WHERE tpr3.player_name = pp.name AND tpr3.race_bf IS NOT NULL AND tpr3.race_bf != '' AND t3.format IS NULL
+					UNION ALL
+					SELECT race_libre as race
+					FROM tournament_player_races tpr3
+					JOIN tournaments t3 ON t3.id = tpr3.tournament_id
+					WHERE tpr3.player_name = pp.name AND tpr3.race_libre IS NOT NULL AND tpr3.race_libre != '' AND t3.format = 'BF'
+					UNION ALL
+					SELECT race_edition_vcr as race
+					FROM tournament_player_races tpr3
+					JOIN tournaments t3 ON t3.id = tpr3.tournament_id
+					WHERE tpr3.player_name = pp.name AND tpr3.race_edition_vcr IS NOT NULL AND tpr3.race_edition_vcr != '' AND t3.format = 'BF'
+				) bf_all
+				GROUP BY race
 				ORDER BY COUNT(*) DESC
 				LIMIT 1
 			) as most_played_race_bf,
@@ -1484,12 +1510,28 @@ func GetGlobalStandings(c *gin.Context) {
 
 // GetGlobalRaces returns aggregated race statistics from all archived tournaments
 func GetGlobalRaces(c *gin.Context) {
-	// Get PB race counts from all tournaments
+	// Get PB race counts from all tournaments (race_pb from mixed + race_libre/race_edition_vcr from PB-only)
 	pbQuery := `
-		SELECT race_pb, COUNT(*) as count
-		FROM tournament_player_races
-		WHERE race_pb IS NOT NULL AND race_pb != ''
-		GROUP BY race_pb
+		SELECT race, SUM(cnt) as count FROM (
+			SELECT race_pb as race, COUNT(*) as cnt
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			WHERE tpr.race_pb IS NOT NULL AND tpr.race_pb != '' AND t.format IS NULL
+			GROUP BY race_pb
+			UNION ALL
+			SELECT race_libre as race, COUNT(*) as cnt
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			WHERE tpr.race_libre IS NOT NULL AND tpr.race_libre != '' AND t.format = 'PB'
+			GROUP BY race_libre
+			UNION ALL
+			SELECT race_edition_vcr as race, COUNT(*) as cnt
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			WHERE tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != '' AND t.format = 'PB'
+			GROUP BY race_edition_vcr
+		) pb_all
+		GROUP BY race
 		ORDER BY count DESC
 	`
 
@@ -1511,12 +1553,28 @@ func GetGlobalRaces(c *gin.Context) {
 		pbRaces[race] = count
 	}
 
-	// Get BF race counts from all tournaments
+	// Get BF race counts from all tournaments (race_bf from mixed + race_libre/race_edition_vcr from BF-only)
 	bfQuery := `
-		SELECT race_bf, COUNT(*) as count
-		FROM tournament_player_races
-		WHERE race_bf IS NOT NULL AND race_bf != ''
-		GROUP BY race_bf
+		SELECT race, SUM(cnt) as count FROM (
+			SELECT race_bf as race, COUNT(*) as cnt
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			WHERE tpr.race_bf IS NOT NULL AND tpr.race_bf != '' AND t.format IS NULL
+			GROUP BY race_bf
+			UNION ALL
+			SELECT race_libre as race, COUNT(*) as cnt
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			WHERE tpr.race_libre IS NOT NULL AND tpr.race_libre != '' AND t.format = 'BF'
+			GROUP BY race_libre
+			UNION ALL
+			SELECT race_edition_vcr as race, COUNT(*) as cnt
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			WHERE tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != '' AND t.format = 'BF'
+			GROUP BY race_edition_vcr
+		) bf_all
+		GROUP BY race
 		ORDER BY count DESC
 	`
 
@@ -1538,20 +1596,54 @@ func GetGlobalRaces(c *gin.Context) {
 		bfRaces[race] = count
 	}
 
-	// Get PB race winrates from all tournaments
+	// Get PB race winrates from all tournaments (race_pb from mixed + race_libre/race_edition_vcr from PB-only)
 	pbWinrateQuery := `
-		SELECT tpr.race_pb, COUNT(*) as total_matches, 
-		       SUM(CASE 
-		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
-		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
-		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
-		             ELSE 0 
-		           END) as win_points
-		FROM tournament_player_races tpr
-		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
-		WHERE tpr.race_pb IS NOT NULL AND tpr.race_pb != ''
-		GROUP BY tpr.race_pb
+		SELECT race, SUM(total_matches) as total_matches, SUM(win_points) as win_points FROM (
+			SELECT tpr.race_pb as race, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'PB' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+			WHERE tpr.race_pb IS NOT NULL AND tpr.race_pb != '' AND t.format IS NULL
+			GROUP BY tpr.race_pb
+			UNION ALL
+			SELECT tpr.race_libre as race, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+			WHERE tpr.race_libre IS NOT NULL AND tpr.race_libre != '' AND t.format = 'PB'
+				AND tr.subformat IN ('libre', 'pbrl', 'bfrl', 'Libre', 'PBRL', 'BFRL')
+			GROUP BY tpr.race_libre
+			UNION ALL
+			SELECT tpr.race_edition_vcr as race, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+			WHERE tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != '' AND t.format = 'PB'
+				AND tr.subformat IN ('pbre', 'bfvcr', 'vcr', 'edición', 'edicion', 'PBRE', 'BFVCR', 'VCR', 'Edición', 'Edicion')
+			GROUP BY tpr.race_edition_vcr
+		) pb_all
+		GROUP BY race
 	`
 
 	pbWinrateRows, err := database.DB.Query(pbWinrateQuery)
@@ -1577,20 +1669,54 @@ func GetGlobalRaces(c *gin.Context) {
 		}
 	}
 
-	// Get BF race winrates from all tournaments
+	// Get BF race winrates from all tournaments (race_bf from mixed + race_libre/race_edition_vcr from BF-only)
 	bfWinrateQuery := `
-		SELECT tpr.race_bf, COUNT(*) as total_matches, 
-		       SUM(CASE 
-		             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
-		             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
-		             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
-		             ELSE 0 
-		           END) as win_points
-		FROM tournament_player_races tpr
-		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
-		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
-		WHERE tpr.race_bf IS NOT NULL AND tpr.race_bf != ''
-		GROUP BY tpr.race_bf
+		SELECT race, SUM(total_matches) as total_matches, SUM(win_points) as win_points FROM (
+			SELECT tpr.race_bf as race, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND tr.format = 'BF' AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+			WHERE tpr.race_bf IS NOT NULL AND tpr.race_bf != '' AND t.format IS NULL
+			GROUP BY tpr.race_bf
+			UNION ALL
+			SELECT tpr.race_libre as race, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+			WHERE tpr.race_libre IS NOT NULL AND tpr.race_libre != '' AND t.format = 'BF'
+				AND tr.subformat IN ('libre', 'pbrl', 'bfrl', 'Libre', 'PBRL', 'BFRL')
+			GROUP BY tpr.race_libre
+			UNION ALL
+			SELECT tpr.race_edition_vcr as race, COUNT(*) as total_matches, 
+			       SUM(CASE 
+			             WHEN m.player1_id = tpr.player_id AND m.score1 > m.score2 THEN 1
+			             WHEN m.player2_id = tpr.player_id AND m.score2 > m.score1 THEN 1
+			             WHEN m.score1 IS NOT NULL AND m.score2 IS NOT NULL AND m.score1 = m.score2 AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id) THEN 0.5
+			             ELSE 0 
+			           END) as win_points
+			FROM tournament_player_races tpr
+			JOIN tournaments t ON t.id = tpr.tournament_id
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
+			WHERE tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != '' AND t.format = 'BF'
+				AND tr.subformat IN ('pbre', 'bfvcr', 'vcr', 'edición', 'edicion', 'PBRE', 'BFVCR', 'VCR', 'Edición', 'Edicion')
+			GROUP BY tpr.race_edition_vcr
+		) bf_all
+		GROUP BY race
 	`
 
 	bfWinrateRows, err := database.DB.Query(bfWinrateQuery)
