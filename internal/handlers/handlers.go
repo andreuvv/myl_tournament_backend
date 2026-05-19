@@ -1857,8 +1857,8 @@ func AddMatchesToRound(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":        "Matches added successfully",
-		"round_number":   roundNumber,
+		"message":         "Matches added successfully",
+		"round_number":    roundNumber,
 		"matches_created": len(pairs),
 	})
 }
