@@ -76,6 +76,9 @@ func main() {
 		// Fixture creation (creates entire tournament structure)
 		protected.POST("/fixture", handlers.CreateFixture)
 
+		// Add matches to an existing round (e.g. extra/final round)
+		protected.POST("/rounds/:round_number/matches", handlers.AddMatchesToRound)
+
 		// Clear tournament data
 		protected.DELETE("/tournament", handlers.ClearTournament)
 

@@ -1751,3 +1751,114 @@ func GetGlobalRaces(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+// AddMatchesToRound adds matches to an existing round (used for the extra/final round)
+func AddMatchesToRound(c *gin.Context) {
+	roundNumberStr := c.Param("round_number")
+	roundNumber, err := strconv.Atoi(roundNumberStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid round number"})
+		return
+	}
+
+	var req struct {
+		Matches []struct {
+			Player1Name string `json:"player1_name" binding:"required"`
+			Player2Name string `json:"player2_name" binding:"required"`
+		} `json:"matches" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.Matches) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one match is required"})
+		return
+	}
+
+	// Find the round
+	var roundID int
+	err = database.DB.QueryRow(
+		"SELECT id FROM rounds WHERE round_number = $1", roundNumber,
+	).Scan(&roundID)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Round not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find round"})
+		return
+	}
+
+	// Resolve player names to IDs
+	type playerPair struct {
+		p1ID int
+		p2ID int
+	}
+	pairs := make([]playerPair, 0, len(req.Matches))
+
+	for _, m := range req.Matches {
+		var p1ID, p2ID int
+		err = database.DB.QueryRow(
+			"SELECT id FROM players WHERE name = $1", m.Player1Name,
+		).Scan(&p1ID)
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Player not found: " + m.Player1Name})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find player: " + m.Player1Name})
+			return
+		}
+
+		err = database.DB.QueryRow(
+			"SELECT id FROM players WHERE name = $1", m.Player2Name,
+		).Scan(&p2ID)
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Player not found: " + m.Player2Name})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find player: " + m.Player2Name})
+			return
+		}
+
+		if p1ID == p2ID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "A player cannot play against themselves: " + m.Player1Name})
+			return
+		}
+
+		pairs = append(pairs, playerPair{p1ID: p1ID, p2ID: p2ID})
+	}
+
+	// Insert matches
+	tx, err := database.DB.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
+	for _, pair := range pairs {
+		_, err := tx.Exec(
+			"INSERT INTO matches (round_id, player1_id, player2_id) VALUES ($1, $2, $3)",
+			roundID, pair.p1ID, pair.p2ID,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create match"})
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message":        "Matches added successfully",
+		"round_number":   roundNumber,
+		"matches_created": len(pairs),
+	})
+}
