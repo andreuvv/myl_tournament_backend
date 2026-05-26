@@ -16,6 +16,7 @@ func GetFixture(c *gin.Context) {
 		SELECT 
 			r.round_number,
 			r.format,
+			r.is_extra_round,
 			m.id as match_id,
 			m.subformat,
 			p1.name as player1_name,
@@ -43,12 +44,14 @@ func GetFixture(c *gin.Context) {
 	for rows.Next() {
 		var roundNum int
 		var format string
+		var isExtraRound bool
 		var subformat *string
 		var match models.MatchDetail
 
 		err := rows.Scan(
 			&roundNum,
 			&format,
+			&isExtraRound,
 			&match.ID,
 			&subformat,
 			&match.Player1Name,
@@ -64,16 +67,18 @@ func GetFixture(c *gin.Context) {
 
 		if _, exists := roundsMap[roundNum]; !exists {
 			roundsMap[roundNum] = &models.FixtureRound{
-				Number:    roundNum,
-				Format:    format,
-				Subformat: subformat,
-				Matches:   []models.MatchDetail{},
+				Number:       roundNum,
+				Format:       format,
+				Subformat:    subformat,
+				IsExtraRound: isExtraRound,
+				Matches:      []models.MatchDetail{},
 			}
 		}
 
 		match.RoundNumber = roundNum
 		match.Format = format
 		match.Subformat = subformat
+		match.IsExtraRound = isExtraRound
 		roundsMap[roundNum].Matches = append(roundsMap[roundNum].Matches, match)
 	}
 
@@ -343,8 +348,8 @@ func CreateFixture(c *gin.Context) {
 	for _, r := range req.Rounds {
 		var roundID int
 		err := tx.QueryRow(
-			"INSERT INTO rounds (round_number, format) VALUES ($1, $2) RETURNING id",
-			r.RoundNumber, r.Format,
+			"INSERT INTO rounds (round_number, format, is_extra_round) VALUES ($1, $2, $3) RETURNING id",
+			r.RoundNumber, r.Format, r.IsExtraRound,
 		).Scan(&roundID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create round"})
@@ -1779,15 +1784,21 @@ func AddMatchesToRound(c *gin.Context) {
 
 	// Find the round
 	var roundID int
+	var isExtraRound bool
 	err = database.DB.QueryRow(
-		"SELECT id FROM rounds WHERE round_number = $1", roundNumber,
-	).Scan(&roundID)
+		"SELECT id, is_extra_round FROM rounds WHERE round_number = $1", roundNumber,
+	).Scan(&roundID, &isExtraRound)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Round not found"})
 		return
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find round"})
+		return
+	}
+
+	if !isExtraRound {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only the extra round can be edited here"})
 		return
 	}
 
@@ -1839,6 +1850,11 @@ func AddMatchesToRound(c *gin.Context) {
 		return
 	}
 	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM matches WHERE round_id = $1", roundID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear existing matches"})
+		return
+	}
 
 	for _, pair := range pairs {
 		_, err := tx.Exec(
