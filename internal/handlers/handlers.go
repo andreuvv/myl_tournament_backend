@@ -45,40 +45,74 @@ func GetFixture(c *gin.Context) {
 		var roundNum int
 		var format string
 		var isExtraRound bool
-		var subformat *string
-		var match models.MatchDetail
+		var matchID sql.NullInt64
+		var subformat sql.NullString
+		var player1Name sql.NullString
+		var player2Name sql.NullString
+		var score1 sql.NullInt64
+		var score2 sql.NullInt64
+		var completed sql.NullBool
+		var updatedAt sql.NullTime
 
 		err := rows.Scan(
 			&roundNum,
 			&format,
 			&isExtraRound,
-			&match.ID,
+			&matchID,
 			&subformat,
-			&match.Player1Name,
-			&match.Player2Name,
-			&match.Score1,
-			&match.Score2,
-			&match.Completed,
-			&match.UpdatedAt,
+			&player1Name,
+			&player2Name,
+			&score1,
+			&score2,
+			&completed,
+			&updatedAt,
 		)
 		if err != nil {
 			continue
+		}
+
+		var roundSubformat *string
+		if subformat.Valid {
+			s := subformat.String
+			roundSubformat = &s
 		}
 
 		if _, exists := roundsMap[roundNum]; !exists {
 			roundsMap[roundNum] = &models.FixtureRound{
 				Number:       roundNum,
 				Format:       format,
-				Subformat:    subformat,
+				Subformat:    roundSubformat,
 				IsExtraRound: isExtraRound,
 				Matches:      []models.MatchDetail{},
 			}
 		}
 
-		match.RoundNumber = roundNum
-		match.Format = format
-		match.Subformat = subformat
-		match.IsExtraRound = isExtraRound
+		if !matchID.Valid {
+			continue
+		}
+
+		match := models.MatchDetail{
+			ID:           int(matchID.Int64),
+			RoundNumber:  roundNum,
+			Format:       format,
+			Subformat:    roundSubformat,
+			IsExtraRound: isExtraRound,
+			Player1Name:  player1Name.String,
+			Player2Name:  player2Name.String,
+			Completed:    completed.Valid && completed.Bool,
+		}
+		if score1.Valid {
+			s := int(score1.Int64)
+			match.Score1 = &s
+		}
+		if score2.Valid {
+			s := int(score2.Int64)
+			match.Score2 = &s
+		}
+		if updatedAt.Valid {
+			match.UpdatedAt = updatedAt.Time
+		}
+
 		roundsMap[roundNum].Matches = append(roundsMap[roundNum].Matches, match)
 	}
 
