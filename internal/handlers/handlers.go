@@ -1615,6 +1615,7 @@ func GetGlobalStandings(c *gin.Context) {
 			COALESCE(SUM(CASE WHEN ts.final_position = 1 THEN 1 ELSE 0 END), 0) as first_place_count,
 			COALESCE(SUM(CASE WHEN ts.final_position = 2 THEN 1 ELSE 0 END), 0) as second_place_count,
 			COALESCE(SUM(CASE WHEN ts.final_position = 3 THEN 1 ELSE 0 END), 0) as third_place_count,
+			COALESCE(SUM(COALESCE(ts.matches_played, 0)), 0) as total_matches_played,
 			-- Most played race PB (includes race_pb from mixed tournaments + race_libre/race_edition_vcr from PB-only tournaments)
 			(
 				SELECT race FROM (
@@ -1725,6 +1726,7 @@ func GetGlobalStandings(c *gin.Context) {
 		LEFT JOIN tournament_standings ts ON ts.player_name = pp.name
 		GROUP BY pp.id, pp.name
 		ORDER BY first_place_count DESC, second_place_count DESC, third_place_count DESC
+			, total_matches_played DESC
 	`
 
 	rows, err := database.DB.Query(query)
@@ -1740,6 +1742,7 @@ func GetGlobalStandings(c *gin.Context) {
 		FirstPlaceCount  int     `json:"first_place_count"`
 		SecondPlaceCount int     `json:"second_place_count"`
 		ThirdPlaceCount  int     `json:"third_place_count"`
+			TotalMatchesPlayed int   `json:"total_matches_played"`
 		MostPlayedRacePB *string `json:"most_played_race_pb"`
 		MostPlayedRaceBF *string `json:"most_played_race_bf"`
 		WinratePB        float64 `json:"winrate_pb"`
@@ -1762,6 +1765,7 @@ func GetGlobalStandings(c *gin.Context) {
 			&s.FirstPlaceCount,
 			&s.SecondPlaceCount,
 			&s.ThirdPlaceCount,
+			&s.TotalMatchesPlayed,
 			&s.MostPlayedRacePB,
 			&s.MostPlayedRaceBF,
 			&pbWins,
