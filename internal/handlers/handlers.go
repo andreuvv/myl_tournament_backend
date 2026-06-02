@@ -1615,6 +1615,7 @@ func GetGlobalStandings(c *gin.Context) {
 			COALESCE(SUM(CASE WHEN ts.final_position = 1 THEN 1 ELSE 0 END), 0) as first_place_count,
 			COALESCE(SUM(CASE WHEN ts.final_position = 2 THEN 1 ELSE 0 END), 0) as second_place_count,
 			COALESCE(SUM(CASE WHEN ts.final_position = 3 THEN 1 ELSE 0 END), 0) as third_place_count,
+			COALESCE(COUNT(DISTINCT CASE WHEN COALESCE(ts.matches_played, 0) > 0 THEN ts.tournament_id END), 0) as tournaments_participated,
 			COALESCE(SUM(COALESCE(ts.matches_played, 0)), 0) as total_matches_played,
 			-- Most played race PB (includes race_pb from mixed tournaments + race_libre/race_edition_vcr from PB-only tournaments)
 			(
@@ -1737,16 +1738,17 @@ func GetGlobalStandings(c *gin.Context) {
 	defer rows.Close()
 
 	type GlobalStanding struct {
-		PlayerID         int     `json:"player_id"`
-		PlayerName       string  `json:"player_name"`
-		FirstPlaceCount  int     `json:"first_place_count"`
-		SecondPlaceCount int     `json:"second_place_count"`
-		ThirdPlaceCount  int     `json:"third_place_count"`
-			TotalMatchesPlayed int   `json:"total_matches_played"`
-		MostPlayedRacePB *string `json:"most_played_race_pb"`
-		MostPlayedRaceBF *string `json:"most_played_race_bf"`
-		WinratePB        float64 `json:"winrate_pb"`
-		WinateBF         float64 `json:"winrate_bf"`
+		PlayerID                int     `json:"player_id"`
+		PlayerName              string  `json:"player_name"`
+		FirstPlaceCount         int     `json:"first_place_count"`
+		SecondPlaceCount        int     `json:"second_place_count"`
+		ThirdPlaceCount         int     `json:"third_place_count"`
+		TournamentsParticipated int     `json:"tournaments_participated"`
+		TotalMatchesPlayed      int     `json:"total_matches_played"`
+		MostPlayedRacePB        *string `json:"most_played_race_pb"`
+		MostPlayedRaceBF        *string `json:"most_played_race_bf"`
+		WinratePB               float64 `json:"winrate_pb"`
+		WinateBF                float64 `json:"winrate_bf"`
 	}
 
 	standings := []GlobalStanding{}
@@ -1765,6 +1767,7 @@ func GetGlobalStandings(c *gin.Context) {
 			&s.FirstPlaceCount,
 			&s.SecondPlaceCount,
 			&s.ThirdPlaceCount,
+			&s.TournamentsParticipated,
 			&s.TotalMatchesPlayed,
 			&s.MostPlayedRacePB,
 			&s.MostPlayedRaceBF,
