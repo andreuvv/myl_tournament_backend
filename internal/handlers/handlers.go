@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/andreuvv/premier_mitologico/backend/internal/database"
@@ -125,6 +126,176 @@ func GetFixture(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.FixtureResponse{Rounds: rounds})
+}
+
+type archiveMatchData struct {
+	Player1ID   sql.NullInt64
+	Player2ID   sql.NullInt64
+	Player1Name string
+	Player2Name string
+	Score1      sql.NullInt64
+	Score2      sql.NullInt64
+	Completed   bool
+}
+
+type archiveRoundData struct {
+	ID           int
+	Number       int
+	Format       string
+	IsExtraRound bool
+	Matches      []archiveMatchData
+}
+
+func sortStandingsForArchive(standings []models.Standing) {
+	sort.SliceStable(standings, func(i, j int) bool {
+		if standings[i].Points != standings[j].Points {
+			return standings[i].Points > standings[j].Points
+		}
+		if standings[i].TotalPointsScored != standings[j].TotalPointsScored {
+			return standings[i].TotalPointsScored > standings[j].TotalPointsScored
+		}
+		if standings[i].Wins != standings[j].Wins {
+			return standings[i].Wins > standings[j].Wins
+		}
+		return standings[i].ID < standings[j].ID
+	})
+}
+
+func calculateArchivedFinalPositions(standings []models.Standing, rounds []archiveRoundData) map[int]int {
+	extraMatches := make([]archiveMatchData, 0)
+	for _, round := range rounds {
+		if round.IsExtraRound {
+			extraMatches = append(extraMatches, round.Matches...)
+		}
+	}
+
+	finalPositions := make(map[int]int, len(standings))
+	if len(standings) == 0 {
+		return finalPositions
+	}
+
+	sortedCurrent := make([]models.Standing, len(standings))
+	copy(sortedCurrent, standings)
+	sortStandingsForArchive(sortedCurrent)
+
+	if len(extraMatches) == 0 {
+		for index, standing := range sortedCurrent {
+			finalPositions[standing.ID] = index + 1
+		}
+		return finalPositions
+	}
+
+	preExtraStandings := make(map[int]*models.Standing, len(standings))
+	for i := range standings {
+		standingCopy := standings[i]
+		preExtraStandings[standingCopy.ID] = &standingCopy
+	}
+
+	for _, match := range extraMatches {
+		if !match.Completed || !match.Score1.Valid || !match.Score2.Valid || !match.Player1ID.Valid || !match.Player2ID.Valid {
+			continue
+		}
+
+		player1 := preExtraStandings[int(match.Player1ID.Int64)]
+		player2 := preExtraStandings[int(match.Player2ID.Int64)]
+		if player1 == nil || player2 == nil {
+			continue
+		}
+
+		score1 := int(match.Score1.Int64)
+		score2 := int(match.Score2.Int64)
+		if score1 > score2 {
+			player1.Points -= 3
+			player1.Wins--
+		} else if score2 > score1 {
+			player2.Points -= 3
+			player2.Wins--
+		} else {
+			player1.Points--
+			player2.Points--
+			player1.Ties--
+			player2.Ties--
+		}
+	}
+
+	sortedPreExtra := make([]models.Standing, 0, len(preExtraStandings))
+	for _, standing := range preExtraStandings {
+		sortedPreExtra = append(sortedPreExtra, *standing)
+	}
+	sortStandingsForArchive(sortedPreExtra)
+
+	seedPositions := make(map[int]int, len(sortedPreExtra))
+	for index, standing := range sortedPreExtra {
+		seedPositions[standing.ID] = index + 1
+	}
+
+	positionOverrides := make(map[int]int)
+	playoffPlayers := make(map[int]bool)
+
+	for _, match := range extraMatches {
+		if !match.Completed || !match.Score1.Valid || !match.Score2.Valid || !match.Player1ID.Valid || !match.Player2ID.Valid {
+			continue
+		}
+
+		position1, ok1 := seedPositions[int(match.Player1ID.Int64)]
+		position2, ok2 := seedPositions[int(match.Player2ID.Int64)]
+		if !ok1 || !ok2 {
+			continue
+		}
+
+		higherPosition := position1
+		lowerPosition := position2
+		if lowerPosition < higherPosition {
+			higherPosition, lowerPosition = lowerPosition, higherPosition
+		}
+
+		score1 := int(match.Score1.Int64)
+		score2 := int(match.Score2.Int64)
+		if score1 > score2 {
+			positionOverrides[int(match.Player1ID.Int64)] = higherPosition
+			positionOverrides[int(match.Player2ID.Int64)] = lowerPosition
+			playoffPlayers[int(match.Player1ID.Int64)] = true
+			playoffPlayers[int(match.Player2ID.Int64)] = true
+		} else if score2 > score1 {
+			positionOverrides[int(match.Player2ID.Int64)] = higherPosition
+			positionOverrides[int(match.Player1ID.Int64)] = lowerPosition
+			playoffPlayers[int(match.Player1ID.Int64)] = true
+			playoffPlayers[int(match.Player2ID.Int64)] = true
+		}
+	}
+
+	if len(positionOverrides) == 0 {
+		for index, standing := range sortedPreExtra {
+			finalPositions[standing.ID] = index + 1
+		}
+		return finalPositions
+	}
+
+	occupiedPositions := make(map[int]bool, len(positionOverrides))
+	for playerID, position := range positionOverrides {
+		finalPositions[playerID] = position
+		occupiedPositions[position] = true
+	}
+
+	remainingPlayers := make([]models.Standing, 0, len(sortedPreExtra))
+	for _, standing := range sortedPreExtra {
+		if !playoffPlayers[standing.ID] {
+			remainingPlayers = append(remainingPlayers, standing)
+		}
+	}
+
+	remainingIndex := 0
+	for position := 1; position <= len(sortedPreExtra); position++ {
+		if occupiedPositions[position] {
+			continue
+		}
+		if remainingIndex < len(remainingPlayers) {
+			finalPositions[remainingPlayers[remainingIndex].ID] = position
+			remainingIndex++
+		}
+	}
+
+	return finalPositions
 }
 
 // GetStandings returns current tournament standings
@@ -544,6 +715,109 @@ func ArchiveTournament(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
+	standingsRows, err := tx.Query(`
+		SELECT id, name, matches_played, wins, ties, losses, points, total_points_scored, total_matches
+		FROM standings
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch standings: " + err.Error()})
+		return
+	}
+	defer standingsRows.Close()
+
+	currentStandings := make([]models.Standing, 0)
+	for standingsRows.Next() {
+		var standing models.Standing
+		if err := standingsRows.Scan(
+			&standing.ID, &standing.Name, &standing.MatchesPlayed, &standing.Wins, &standing.Ties,
+			&standing.Losses, &standing.Points, &standing.TotalPointsScored, &standing.TotalMatches,
+		); err != nil {
+			continue
+		}
+		currentStandings = append(currentStandings, standing)
+	}
+
+	roundRows, err := tx.Query(`
+		SELECT
+			r.id,
+			r.round_number,
+			r.format,
+			r.is_extra_round,
+			m.id,
+			m.player1_id,
+			m.player2_id,
+			COALESCE(p1.name, 'Unknown'),
+			COALESCE(p2.name, 'Unknown'),
+			m.score1,
+			m.score2,
+			m.completed
+		FROM rounds r
+		LEFT JOIN matches m ON m.round_id = r.id
+		LEFT JOIN players p1 ON m.player1_id = p1.id
+		LEFT JOIN players p2 ON m.player2_id = p2.id
+		ORDER BY r.round_number, m.id
+	`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rounds: " + err.Error()})
+		return
+	}
+	defer roundRows.Close()
+
+	roundsMap := make(map[int]*archiveRoundData)
+	for roundRows.Next() {
+		var roundID, roundNumber int
+		var format string
+		var isExtraRound bool
+		var matchID sql.NullInt64
+		var player1ID sql.NullInt64
+		var player2ID sql.NullInt64
+		var player1Name string
+		var player2Name string
+		var score1 sql.NullInt64
+		var score2 sql.NullInt64
+		var completed sql.NullBool
+
+		if err := roundRows.Scan(
+			&roundID, &roundNumber, &format, &isExtraRound, &matchID, &player1ID, &player2ID,
+			&player1Name, &player2Name, &score1, &score2, &completed,
+		); err != nil {
+			continue
+		}
+
+		if _, exists := roundsMap[roundNumber]; !exists {
+			roundsMap[roundNumber] = &archiveRoundData{
+				ID:           roundID,
+				Number:       roundNumber,
+				Format:       format,
+				IsExtraRound: isExtraRound,
+				Matches:      []archiveMatchData{},
+			}
+		}
+
+		if !matchID.Valid {
+			continue
+		}
+
+		roundsMap[roundNumber].Matches = append(roundsMap[roundNumber].Matches, archiveMatchData{
+			Player1ID:   player1ID,
+			Player2ID:   player2ID,
+			Player1Name: player1Name,
+			Player2Name: player2Name,
+			Score1:      score1,
+			Score2:      score2,
+			Completed:   completed.Valid && completed.Bool,
+		})
+	}
+
+	archivedRounds := make([]archiveRoundData, 0, len(roundsMap))
+	for i := 1; i <= len(roundsMap); i++ {
+		if round, exists := roundsMap[i]; exists {
+			archivedRounds = append(archivedRounds, *round)
+		}
+	}
+
+	finalPositions := calculateArchivedFinalPositions(currentStandings, archivedRounds)
+
 	// Create tournament record
 	var tournamentID int
 	err = tx.QueryRow(`
@@ -556,82 +830,53 @@ func ArchiveTournament(c *gin.Context) {
 		return
 	}
 
-	// Archive current standings with position
-	standingsQuery := `
-		INSERT INTO tournament_standings (
-			tournament_id, player_id, player_name, matches_played, wins, ties, losses,
-			points, total_points_scored, total_matches, final_position
-		)
-		SELECT 
-			$1, id, name, matches_played, wins, ties, losses,
-			points, total_points_scored, total_matches,
-			ROW_NUMBER() OVER (ORDER BY points DESC, total_points_scored DESC) as position
-		FROM standings
-	`
-	_, err = tx.Exec(standingsQuery, tournamentID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive standings: " + err.Error()})
-		return
-	}
+	for _, standing := range currentStandings {
+		finalPosition := finalPositions[standing.ID]
+		if finalPosition == 0 {
+			finalPosition = len(currentStandings)
+		}
 
-	// Archive rounds and matches
-	// First, fetch all rounds into memory
-	type roundData struct {
-		ID     int
-		Number int
-		Format string
-	}
-	var rounds []roundData
-
-	roundsRows, err := tx.Query(`SELECT id, round_number, format FROM rounds ORDER BY round_number`)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch rounds: " + err.Error()})
-		return
-	}
-
-	for roundsRows.Next() {
-		var r roundData
-		if err := roundsRows.Scan(&r.ID, &r.Number, &r.Format); err != nil {
-			roundsRows.Close()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan round: " + err.Error()})
+		_, err = tx.Exec(`
+			INSERT INTO tournament_standings (
+				tournament_id, player_id, player_name, matches_played, wins, ties, losses,
+				points, total_points_scored, total_matches, final_position
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		`, tournamentID, standing.ID, standing.Name, standing.MatchesPlayed, standing.Wins, standing.Ties,
+			standing.Losses, standing.Points, standing.TotalPointsScored, standing.TotalMatches, finalPosition)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive standings: " + err.Error()})
 			return
 		}
-		rounds = append(rounds, r)
 	}
-	roundsRows.Close()
 
-	// Now process each round
-	for _, round := range rounds {
+	for _, round := range archivedRounds {
 		// Create tournament round
 		var tournamentRoundID int
 		err = tx.QueryRow(`
-			INSERT INTO tournament_rounds (tournament_id, round_number, format)
-			VALUES ($1, $2, $3)
+			INSERT INTO tournament_rounds (tournament_id, round_number, format, is_extra_round)
+			VALUES ($1, $2, $3, $4)
 			RETURNING id
-		`, tournamentID, round.Number, round.Format).Scan(&tournamentRoundID)
+		`, tournamentID, round.Number, round.Format, round.IsExtraRound).Scan(&tournamentRoundID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tournament round: " + err.Error()})
 			return
 		}
 
 		// Archive matches for this round
-		_, err = tx.Exec(`
-			INSERT INTO tournament_matches (
-				tournament_round_id, player1_id, player2_id, player1_name, player2_name,
-				score1, score2, completed
-			)
-			SELECT 
-				$1, m.player1_id, m.player2_id, 
-				COALESCE(p1.name, 'Unknown'), COALESCE(p2.name, 'Unknown'),
-				m.score1, m.score2, m.completed
-			FROM matches m
-			LEFT JOIN players p1 ON m.player1_id = p1.id
-			LEFT JOIN players p2 ON m.player2_id = p2.id
-			WHERE m.round_id = $2
-		`, tournamentRoundID, round.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive matches: " + err.Error()})
-			return
+		for _, match := range round.Matches {
+			_, err = tx.Exec(`
+				INSERT INTO tournament_matches (
+					tournament_round_id, player1_id, player2_id, player1_name, player2_name,
+					score1, score2, completed
+				)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			`, tournamentRoundID, match.Player1ID.Int64, match.Player2ID.Int64, match.Player1Name, match.Player2Name,
+				match.Score1, match.Score2, match.Completed)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to archive matches: " + err.Error()})
+				return
+			}
 		}
 	}
 
@@ -733,7 +978,7 @@ func GetTournamentRounds(c *gin.Context) {
 
 	// Get rounds
 	roundsQuery := `
-		SELECT id, round_number, format, subformat
+		SELECT id, round_number, format, is_extra_round, subformat
 		FROM tournament_rounds
 		WHERE tournament_id = $1
 		ORDER BY round_number
@@ -751,17 +996,19 @@ func GetTournamentRounds(c *gin.Context) {
 	for rows.Next() {
 		var roundID, roundNumber int
 		var format string
+		var isExtraRound bool
 		var subformat *string
-		err := rows.Scan(&roundID, &roundNumber, &format, &subformat)
+		err := rows.Scan(&roundID, &roundNumber, &format, &isExtraRound, &subformat)
 		if err != nil {
 			continue
 		}
 
 		roundsMap[roundNumber] = &models.TournamentRoundDetail{
-			Number:    roundNumber,
-			Format:    format,
-			Subformat: subformat,
-			Matches:   []models.TournamentMatchInfo{},
+			Number:       roundNumber,
+			Format:       format,
+			IsExtraRound: isExtraRound,
+			Subformat:    subformat,
+			Matches:      []models.TournamentMatchInfo{},
 		}
 
 		// Get matches for this round

@@ -145,6 +145,7 @@ type TournamentRound struct {
 	TournamentID int       `json:"tournament_id"`
 	RoundNumber  int       `json:"round_number"`
 	Format       string    `json:"format"`
+	IsExtraRound bool      `json:"is_extra_round"`
 	Subformat    *string   `json:"subformat"` // PBRL, PBRE, BFRL, BFVCR
 	CreatedAt    time.Time `json:"created_at"`
 }
@@ -171,10 +172,11 @@ type ArchiveTournamentRequest struct {
 }
 
 type TournamentRoundDetail struct {
-	Number    int                   `json:"number"`
-	Format    string                `json:"format"`
-	Subformat *string               `json:"subformat"` // PBRL, PBRE, BFRL, BFVCR
-	Matches   []TournamentMatchInfo `json:"matches"`
+	Number       int                   `json:"number"`
+	Format       string                `json:"format"`
+	IsExtraRound bool                  `json:"is_extra_round"`
+	Subformat    *string               `json:"subformat"` // PBRL, PBRE, BFRL, BFVCR
+	Matches      []TournamentMatchInfo `json:"matches"`
 }
 
 type TournamentMatchInfo struct {
