@@ -1290,7 +1290,8 @@ func GetTournamentRaces(c *gin.Context) {
 		             ELSE 0 
 		           END) as win_points
 		FROM tournament_player_races tpr
-		JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id AND (COALESCE(tr.subformat, '') LIKE '%Edition' OR COALESCE(tr.subformat, '') LIKE '%VCR')
+			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
+				AND LOWER(COALESCE(tr.subformat, '')) IN ('pbre', 'bfvcr', 'vcr', 'edition', 'edición', 'edicion')
 		JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 		WHERE tpr.tournament_id = $1 AND tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != ''
 		GROUP BY tpr.race_edition_vcr
@@ -1926,7 +1927,7 @@ func GetGlobalRaces(c *gin.Context) {
 			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
 			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 			WHERE tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != '' AND t.format = 'PB'
-				AND tr.subformat IN ('pbre', 'bfvcr', 'vcr', 'edición', 'edicion', 'PBRE', 'BFVCR', 'VCR', 'Edición', 'Edicion')
+				AND tr.subformat IN ('pbre', 'bfvcr', 'vcr', 'edition', 'edición', 'edicion', 'PBRE', 'BFVCR', 'VCR', 'Edition', 'Edición', 'Edicion')
 			GROUP BY tpr.race_edition_vcr
 		) pb_all
 		GROUP BY race
@@ -1999,7 +2000,7 @@ func GetGlobalRaces(c *gin.Context) {
 			JOIN tournament_rounds tr ON tr.tournament_id = tpr.tournament_id
 			JOIN tournament_matches m ON m.tournament_round_id = tr.id AND (m.player1_id = tpr.player_id OR m.player2_id = tpr.player_id)
 			WHERE tpr.race_edition_vcr IS NOT NULL AND tpr.race_edition_vcr != '' AND t.format = 'BF'
-				AND tr.subformat IN ('pbre', 'bfvcr', 'vcr', 'edición', 'edicion', 'PBRE', 'BFVCR', 'VCR', 'Edición', 'Edicion')
+				AND tr.subformat IN ('pbre', 'bfvcr', 'vcr', 'edition', 'edición', 'edicion', 'PBRE', 'BFVCR', 'VCR', 'Edition', 'Edición', 'Edicion')
 			GROUP BY tpr.race_edition_vcr
 		) bf_all
 		GROUP BY race
