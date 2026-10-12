@@ -146,7 +146,52 @@ type archiveRoundData struct {
 	Matches      []archiveMatchData
 }
 
-func sortStandingsForArchive(standings []models.Standing) {
+func sameArchiveRankingKey(a, b models.Standing) bool {
+	return a.Points == b.Points && a.TotalPointsScored == b.TotalPointsScored && a.Wins == b.Wins
+}
+
+// headToHeadWinner reports who won more non-final matches between the two players.
+// Finals are excluded: that round assigns places directly and must not break the pre-final tie.
+// Returns 0 when the direct record is tied or they did not play.
+func headToHeadWinner(rounds []archiveRoundData, playerA, playerB int) int {
+	aWins, bWins := 0, 0
+	for _, round := range rounds {
+		if round.IsExtraRound {
+			continue
+		}
+		for _, match := range round.Matches {
+			if !match.Completed || !match.Score1.Valid || !match.Score2.Valid || !match.Player1ID.Valid || !match.Player2ID.Valid {
+				continue
+			}
+			if match.Score1.Int64 == match.Score2.Int64 {
+				continue
+			}
+			p1 := int(match.Player1ID.Int64)
+			p2 := int(match.Player2ID.Int64)
+			if !((p1 == playerA && p2 == playerB) || (p1 == playerB && p2 == playerA)) {
+				continue
+			}
+			winner := p2
+			if match.Score1.Int64 > match.Score2.Int64 {
+				winner = p1
+			}
+			if winner == playerA {
+				aWins++
+			} else {
+				bWins++
+			}
+		}
+	}
+	if aWins > bWins {
+		return playerA
+	}
+	if bWins > aWins {
+		return playerB
+	}
+	return 0
+}
+
+func sortStandingsForArchive(standings []models.Standing, rounds []archiveRoundData) {
 	sort.SliceStable(standings, func(i, j int) bool {
 		if standings[i].Points != standings[j].Points {
 			return standings[i].Points > standings[j].Points
@@ -159,6 +204,19 @@ func sortStandingsForArchive(standings []models.Standing) {
 		}
 		return standings[i].ID < standings[j].ID
 	})
+
+	// Victoria directa only reorders a pairwise tie. A larger group can be
+	// non-transitive, so those stay on the criteria above.
+	for i := 0; i < len(standings); {
+		j := i + 1
+		for j < len(standings) && sameArchiveRankingKey(standings[i], standings[j]) {
+			j++
+		}
+		if j-i == 2 && headToHeadWinner(rounds, standings[i].ID, standings[i+1].ID) == standings[i+1].ID {
+			standings[i], standings[i+1] = standings[i+1], standings[i]
+		}
+		i = j
+	}
 }
 
 func calculateArchivedFinalPositions(standings []models.Standing, rounds []archiveRoundData) map[int]int {
@@ -176,7 +234,7 @@ func calculateArchivedFinalPositions(standings []models.Standing, rounds []archi
 
 	sortedCurrent := make([]models.Standing, len(standings))
 	copy(sortedCurrent, standings)
-	sortStandingsForArchive(sortedCurrent)
+	sortStandingsForArchive(sortedCurrent, rounds)
 
 	if len(extraMatches) == 0 {
 		for index, standing := range sortedCurrent {
@@ -204,6 +262,9 @@ func calculateArchivedFinalPositions(standings []models.Standing, rounds []archi
 
 		score1 := int(match.Score1.Int64)
 		score2 := int(match.Score2.Int64)
+		// The final's own points and game score must not change who was seeded where.
+		player1.TotalPointsScored -= score1
+		player2.TotalPointsScored -= score2
 		if score1 > score2 {
 			player1.Points -= 3
 			player1.Wins--
@@ -222,7 +283,7 @@ func calculateArchivedFinalPositions(standings []models.Standing, rounds []archi
 	for _, standing := range preExtraStandings {
 		sortedPreExtra = append(sortedPreExtra, *standing)
 	}
-	sortStandingsForArchive(sortedPreExtra)
+	sortStandingsForArchive(sortedPreExtra, rounds)
 
 	seedPositions := make(map[int]int, len(sortedPreExtra))
 	for index, standing := range sortedPreExtra {
